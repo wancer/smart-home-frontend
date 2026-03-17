@@ -1,0 +1,25 @@
+html {
+  margin: 20px 0 20px 0;
+  padding: 0;
+  width: 100%;
+  text-align: center;
+}
+
+.centre-container {
+  width: 1200px;
+  margin: 0 auto;
+}
+
+thead tr th {
+  text-align: center;
+}
+
+.main-table tr.success td {
+  background-color: var(--bs-success);
+  color: var(--bs-success-bg-subtle);
+}
+
+.main-table tbody td {
+  text-align: right;
+  font-family: monospace, monospace;
+}

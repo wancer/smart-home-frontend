@@ -1,3 +1,4 @@
+import Device from "./device";
 import SensorEvent from "./sensor";
 
 export default class Api {
@@ -13,7 +14,7 @@ export default class Api {
         }
     }
 
-    public async devices(): Promise<SensorEvent | null> {
+    public async devices(): Promise<Device[]> {
         try {
             const response = await fetch(import.meta.env.VITE_API_URL + '/api/devices');
             if (!response.ok) {
@@ -23,7 +24,7 @@ export default class Api {
             return parsed;
         } catch (e) {
             console.error((e as Error).message);
-            return null;
+            return [];
         }
     }
 }

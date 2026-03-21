@@ -1,7 +1,9 @@
+'use client';
+
 import {
   useParams,
 } from "react-router-dom";
-import Device from "../device.ts";
+import Device from "../api/types/device.ts";
 import {
   AreaChart,
   Area,
@@ -9,25 +11,26 @@ import {
   XAxis,
   YAxis,
   Tooltip,
-  TooltipContentProps,
-  RadialBarChart, RadialBar, Legend,
 } from "recharts";
 
-import {Record} from "../sensor.ts"
-import {MenuRow} from "./menu-row.tsx"
+import SensorEvent from "../api/types/sensor.ts"
 
 type DeviceProperties = {
   devices: Device[];
   records: any;
-  lastEvents: object[];
 };
 
 
-function GetById(devices: Device[], id: number): Device {
-  return devices.find((device: Device): boolean => device.id === id);
+function GetById(devices: Device[], id: number): Device|null {
+  for (const device of devices) {
+    if (device.id === id) {
+      return device;
+    }
+  }
+  return null;
 }
 
-export function DevicePage({ devices, records, lastEvents }: DeviceProperties) {
+export function DevicePage({ devices, records }: DeviceProperties) {
   const { id: idRaw } = useParams();
   if (typeof idRaw === "undefined") {
     return <></>;
@@ -36,31 +39,18 @@ export function DevicePage({ devices, records, lastEvents }: DeviceProperties) {
     return <></>;
   }
 
-  const radialData = [
-      {
-    name: '18-24',
-    uv: 31.47,
-    pv: 21512,
-    fill: '#8884d8',
-  },
-      {
-    name: '22-33',
-    uv: 111,
-    pv: 2400,
-    fill: '#8884d8',
-  },
-  ];
-
   const id = parseInt(idRaw);
   const device = GetById(devices, id);
+  if (!device) {
+    return <></>
+  }
 
-  const now = Date.now();
   const recentRecords = records
-    .filter((r: Record) => r.DeviceId === device.id)
-    .sort((a: Record, b: Record) => b.DeviceTime - a.DeviceTime)
+    .filter((r: SensorEvent) => r.deviceId === device.id)
+    .sort((a: SensorEvent, b: SensorEvent) => b.deviceTime - a.deviceTime)
     .slice(0, 4 * 60 * 24) // 4 data points per minute
-    .map((a: Record): object => {
-      const date = new Date(a.DeviceTime * 1000);
+    .map((a: SensorEvent): object => {
+      const date = new Date(a.deviceTime * 1000);
       return {
         axisText: date.getHours() + ":" + date.getMinutes(),
         tooltipText:
@@ -73,43 +63,20 @@ export function DevicePage({ devices, records, lastEvents }: DeviceProperties) {
           date.getHours() +
           ":" +
           date.getMinutes(),
-        power: a.Power,
+        power: a.power,
       };
     });
+    /*
   const CustomTooltip = ({ active, payload, label }: TooltipContentProps) => {
     if (payload.length > 0) {
       const data = payload[0].payload;
       return <>{data.tooltipText}</>;
     }
     return <>dsadas</>;
-  };
+  };*/
 
   return (
-    <div className="right_col" role="main">
-      <div className="page-header">
-        <div className="row">
-          <div className="col-sm-8">
-            <div className="device-list-small">
-              <ul className="list-inline">
-                {devices.map((device: Device) => MenuRow(device))}
-              </ul>
-            </div>
-            <h1>
-              <i className="fa fa-plug"></i> {device.name}
-            </h1>
-          </div>
-          <div className="col-sm-4">
-            <div
-              id="connection-error"
-              className="alert alert-danger"
-              style={{ display: "none" }}
-            >
-              Connection lost. Attempting to re-establish...
-            </div>
-          </div>
-        </div>
-      </div>
-
+    <>
       <div className="row">
         <div className="col-md-4 col-sm-4 col-xs-12">
           <div className="x_panel tile">
@@ -122,33 +89,18 @@ export function DevicePage({ devices, records, lastEvents }: DeviceProperties) {
             <div className="x_content">
               <div className="row">
                 <h1 className="text-center">
-                  <strong id="rtu-power">{lastEvents[device.id] ? lastEvents[device.id].Power : (<>-</>)} W</strong>
+                  <strong id="rtu-power">{device.state.power} W</strong>
                 </h1>
-              </div>
-              <div className="row text-center">
-                <div>
-                    <RadialBarChart
-                      style={{ width: '100%', aspectRatio: 1.5, maxHeight: 150 }}
-                      responsive
-                      cx="30%"
-                      barSize={14}
-                      data={radialData}
-                    >
-                      <RadialBar label={{ position: 'insideStart', fill: '#fff' }} background dataKey="uv" />
-                      <Legend iconSize={10} layout="vertical" verticalAlign="middle" />
-                      <Tooltip />
-                    </RadialBarChart>
-                </div>
               </div>
               <div className="row">
                 <div className="col-md-6 col-xs-6 text-center">
                   <h1>
-                  <strong id="rtu-power">{lastEvents[device.id] ? lastEvents[device.id].Current : (<>-</>)} A</strong>
+                  <strong id="rtu-power">{device.state.current} A</strong>
                   </h1>
                 </div>
                 <div className="col-md-6 col-xs-6 text-center">
                   <h1>
-                  <strong id="rtu-power">{lastEvents[device.id] ? lastEvents[device.id].Voltage : (<>-</>)} V</strong>
+                  <strong id="rtu-power">{device.state.voltage} V</strong>
                   </h1>
                 </div>
               </div>
@@ -357,6 +309,24 @@ export function DevicePage({ devices, records, lastEvents }: DeviceProperties) {
           </div>
         </div>
       </div>
-    </div>
+
+        
+        <footer>
+          <ul className="list-inline">
+            <li>
+              <strong>Device name:</strong> device.name
+            </li>
+            <li>
+              <strong>Model:</strong> device.model
+            </li>
+            <li>
+              <strong>Sw ver:</strong> device.softwareVersion
+            </li>
+            <li>
+              <strong>Hw ver:</strong> device.hardwareVersion
+            </li>
+          </ul>
+        </footer>
+    </>
   );
 }

@@ -1,11 +1,14 @@
+'use client';
+
 import {Link} from "react-router-dom";
-import Device from "../device.ts";
+import Device from "../api/types/device.ts";
 
 export function MenuRow(device: Device) {
   return (
     <li>
-      <Link to={"/device/" + device.id}>
-        <i className="fa fa-plug"></i> {device.name}
+      <Link to={"/device/" + device.id} className="nav-link">
+        <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i> 
+        {device.name}
       </Link>
     </li>
   );

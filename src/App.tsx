@@ -1,56 +1,88 @@
-import { useEffect, useState } from "react";
 import "./App.scss";
-import Record from "./sensor.ts";
-import Device from "./device.ts";
-import Api from "./api.ts";
+
+import { useEffect, useState } from "react";
+import SensorEvent from "./api/types/sensor.ts";
+import Device from "./api/types/device.ts";
+import HttpApi from "./api/http.ts";
 import {DevicePage} from "./page/device-page.tsx"
-import {MenuRow} from "./page/menu-row.tsx"
-import useWebSocket, { ReadyState } from "react-use-websocket"
+import useWebSocket from "react-use-websocket"
 import {BrowserRouter, Routes, Route, } from "react-router-dom";
 
+import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
+import Menu from "./page/menu.tsx";
+import { DashboardPage } from "./page/dashboard.tsx";
 
-type MenuProperties = {
-  devices: Device[];
-};
-
-function Menu({ devices }: MenuProperties) {
-  return (
-    <div className="col-md-3 left_col">
-      <div className="left_col scroll-view">
-        <div className="navbar nav_title" style={{ border: 0 }}>
-          <a href="index.html" className="site_title">
-            <span>Energy Monitor</span>
-          </a>
-        </div>
-
-        <div className="clearfix"></div>
-
-        <div
-          id="sidebar-menu"
-          className="main_menu_side hidden-print main_menu"
-        >
-          <div className="menu_section">
-            <h3>Devices</h3>
-            <ul className="nav side-menu">
-              {devices.map((device: Device) => MenuRow(device))}
-            </ul>
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-}
+const localStorageField = "jwt";
 
 function App() {
-  const [devices, setDevices] = useState<Device[]>([]);
-  const [records, setRecords] = useState<Record[]>([]);
-  const [events, setEvent] = useState<MessageEvent<any>[]>([]);
-  const [lastEvents, setLastEvent] = useState({});
+  const jwt = localStorage.getItem(localStorageField);
+  const [isLoggedIn, setLoggedIn] = useState<boolean>(jwt !== null);
+  const [api] = useState<HttpApi>(new HttpApi(jwt || ""));
 
-  const api = new Api();
+  return <GoogleOAuthProvider clientId={import.meta.env.VITE_GOOGLE_CLIENT_ID}>
+    { !isLoggedIn && <div id="login-center"> <GoogleLogin 
+        onSuccess={credentialResponse => {
+          api.login(credentialResponse)
+            .then(
+              apiResponse => {
+                localStorage.setItem(localStorageField, apiResponse.token)
+                api.token = apiResponse.token;
+                setLoggedIn(true)
+              }
+            )
+            .catch(err => console.error(err))
+          ;
+        }}
+        onError={() => {
+          console.log('Login Failed');
+        }}
+      />
+      </div>
+      }
+
+     { isLoggedIn && <AuthorizedUserApp api={api}></AuthorizedUserApp>}
+
+  </GoogleOAuthProvider>;
+}
+
+
+type AuthorizedUserAppProperties = {
+  api: HttpApi;
+};
+
+function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
+  const [socketUrl] = useState(import.meta.env.VITE_API_URL +'/api/ws?jwt=' + api.token);
+  const { lastMessage } = useWebSocket(socketUrl);
+
+  useEffect(() => {
+    if (lastMessage !== null) {
+      const parsed = JSON.parse(lastMessage.data);
+      if (parsed.channel === 'sensor') {
+        const exact = new SensorEvent(parsed.body);
+
+        
+            for (const device of devices) {
+              if (device.id === parsed.body.deviceId) {
+                device.state.current = exact.current;
+                device.state.voltage = exact.voltage;
+                device.state.power = exact.power;
+              }
+            }
+
+            records.push(exact);
+
+            return;
+      } 
+      console.warn("unkown type", parsed)
+    }
+  }, [lastMessage]);
+
+  const [devices, setDevices] = useState<Device[]>([]);
+  const [records, setRecords] = useState<SensorEvent[]>([]);
 
   useEffect(() => {
     api.devices().then((devices) => {
+      devices.sort((a: Device, b:Device) => (a.id > b.id) ? 1 : -1)
       setDevices(devices);
     });
 
@@ -59,59 +91,22 @@ function App() {
     });
   }, []);
 
+  return <BrowserRouter>
+        <div className="container">
+            <div className="row">
+                <div className="col-md-3">
+                    <Menu devices={devices} />
+                </div>
 
-
-  const [socketUrl, setSocketUrl] = useState(import.meta.env.VITE_API_URL +'/api/ws');
-  const { sendMessage, lastMessage, readyState } = useWebSocket(socketUrl);
-
-  useEffect(() => {
-    if (lastMessage !== null) {
-      const parsed = JSON.parse(lastMessage.data);
-      if (parsed.channel === 'sensor') {
-        console.log(parsed.body);
-        setEvent((prev: any) => prev.concat(lastMessage));
-        setLastEvent(prevState => ({...prevState, [parsed.body.DeviceId]: parsed.body }));
-        return;
-      } 
-      console.warn("unkown type", parsed)
-    }
-  }, [lastMessage]);
-
-  return (
-    <BrowserRouter>
-      <div>
-        <div className="container body">
-          <div className="main_container">
-            <Menu devices={devices} />
-
-            <Routes>
-              <Route
-                path="/device/:id"
-                element={<DevicePage devices={devices} records={records} lastEvents={lastEvents} />}
-              />
-            </Routes>
-          </div>
+                <div className="col-md-9">
+                    <Routes>
+                    <Route path="/" element={<DashboardPage devices={devices}/>} />
+                    <Route path="/device/:id" element={<DevicePage devices={devices} records={records} />}/>
+                    </Routes>
+                </div>
+            </div>
         </div>
-        
-        <footer>
-          <ul className="list-inline">
-            <li>
-              <strong>Device name:</strong> device.name
-            </li>
-            <li>
-              <strong>Model:</strong> device.model
-            </li>
-            <li>
-              <strong>Sw ver:</strong> device.softwareVersion
-            </li>
-            <li>
-              <strong>Hw ver:</strong> device.hardwareVersion
-            </li>
-          </ul>
-        </footer>
-      </div>
-    </BrowserRouter>
-  );
+    </BrowserRouter>;
 }
 
 export default App;

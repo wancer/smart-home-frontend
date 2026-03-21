@@ -1,4 +1,4 @@
-import Device from "./types/device";
+import DeviceEvent from "./types/device";
 import Login from "./types/login";
 import SensorEvent from "./types/sensor";
 import { CredentialResponse } from '@react-oauth/google';
@@ -29,7 +29,7 @@ export default class HttpApi {
         }
     }
 
-    public async devices(): Promise<Device[]> {
+    public async devices(): Promise<DeviceEvent[]> {
         const response = await fetch(
             import.meta.env.VITE_API_URL + '/api/devices',
             {
@@ -62,5 +62,23 @@ export default class HttpApi {
         }
         const parsed = response.json()
         return parsed;
+    }
+
+    public async control(deviceId: number, parameter: string, value: string): Promise<void> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + '/api/device/control',
+            {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.token,
+                },
+                body: JSON.stringify({"deviceId": deviceId,"parameter": parameter, "value": value}),
+            }
+        );
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
     }
 }

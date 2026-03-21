@@ -1,9 +1,9 @@
 'use client';
 
 import {Link} from "react-router-dom";
-import Device from "../api/types/device.ts";
+import DeviceEvent from "../api/types/device.ts";
 
-export function MenuRow(device: Device) {
+export function MenuRow(device: DeviceEvent) {
   return (
     <li>
       <Link to={"/device/" + device.id} className="nav-link">

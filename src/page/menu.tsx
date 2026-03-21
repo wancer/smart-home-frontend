@@ -1,11 +1,11 @@
 'use client';
 
-import Device from "../api/types/device";
+import DeviceEvent from "../api/types/device";
 import { MenuRow } from "./menu-row";
 import {Link} from "react-router-dom";
 
 type MenuProperties = {
-  devices: Device[];
+  devices: DeviceEvent[];
 };
 
 export default function Menu({ devices }: MenuProperties) {
@@ -14,7 +14,7 @@ export default function Menu({ devices }: MenuProperties) {
             <li className="nav-item">
                 <Link to={"/"} className="nav-link"> <i className={"fa-solid fa-gauge"}></i> Dashboard </Link>
             </li>
-            {devices.map((device: Device) => MenuRow(device))}
+            {devices.map((device: DeviceEvent) => MenuRow(device))}
         </ul>
   );
 }

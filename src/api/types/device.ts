@@ -16,7 +16,7 @@ class DeviceState {
     }
 }
 
-export default class Device {
+export default class DeviceEvent {
     public id: number;
     public name: string;
     public state: DeviceState;

@@ -1,13 +1,13 @@
 "use client";
 
-import Device from "../api/types/device";
+import DeviceEvent from "../api/types/device";
 
 type DashboardProperties = {
-  devices: Device[];
+  devices: DeviceEvent[];
 };
 
 function DeviceBlock(
-  device: Device,
+  device: DeviceEvent,
 ) {
   return (
     <div className="col-md-6 col-sm-6 col-xs-12">
@@ -53,7 +53,7 @@ export function DashboardPage({ devices }: DashboardProperties) {
   return (
     <>
       <div className="row">
-        {devices.map((device: Device) => DeviceBlock(device))}
+        {devices.map((device: DeviceEvent) => DeviceBlock(device))}
       </div>
     </>
   );

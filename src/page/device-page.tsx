@@ -1,9 +1,7 @@
 'use client';
 
-import {
-  useParams,
-} from "react-router-dom";
-import Device from "../api/types/device.ts";
+import { useParams, Link } from "react-router-dom";
+import DeviceEvent from "../api/types/device.ts";
 import {
   AreaChart,
   Area,
@@ -16,12 +14,11 @@ import {
 import SensorEvent from "../api/types/sensor.ts"
 
 type DeviceProperties = {
-  devices: Device[];
+  devices: DeviceEvent[];
   records: any;
 };
 
-
-function GetById(devices: Device[], id: number): Device|null {
+function GetById(devices: DeviceEvent[], id: number): DeviceEvent|null {
   for (const device of devices) {
     if (device.id === id) {
       return device;
@@ -45,9 +42,32 @@ export function DevicePage({ devices, records }: DeviceProperties) {
     return <></>
   }
 
-  const recentRecords = records
+
+  const sensors1h = records
     .filter((r: SensorEvent) => r.deviceId === device.id)
-    .sort((a: SensorEvent, b: SensorEvent) => b.deviceTime - a.deviceTime)
+    .sort((a: SensorEvent, b: SensorEvent) => a.deviceTime - b.deviceTime)
+    .slice(0, 4 * 60) // 4 data points per minute
+    .map((a: SensorEvent): object => {
+      const date = new Date(a.deviceTime * 1000);
+      return {
+        axisText: date.getHours() + ":" + date.getMinutes(),
+        tooltipText:
+          date.getFullYear() +
+          "-" +
+          date.getMonth() +
+          "-" +
+          date.getDate() +
+          " " +
+          date.getHours() +
+          ":" +
+          date.getMinutes(),
+        power: a.power,
+      };
+    });
+
+  const sensors24h = records
+    .filter((r: SensorEvent) => r.deviceId === device.id)
+    .sort((a: SensorEvent, b: SensorEvent) => a.deviceTime - b.deviceTime)
     .slice(0, 4 * 60 * 24) // 4 data points per minute
     .map((a: SensorEvent): object => {
       const date = new Date(a.deviceTime * 1000);
@@ -77,6 +97,17 @@ export function DevicePage({ devices, records }: DeviceProperties) {
 
   return (
     <>
+      <div className="row">
+        
+        <h2>
+          <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i> 
+          {device.name}
+          
+          <Link to={"/device/" + device.id + "/control"} className=""> 
+            <i className={"fa fa-cog text-primary"}></i> 
+          </Link>
+        </h2>
+      </div>
       <div className="row">
         <div className="col-md-4 col-sm-4 col-xs-12">
           <div className="x_panel tile">
@@ -120,7 +151,7 @@ export function DevicePage({ devices, records }: DeviceProperties) {
               <AreaChart
                 style={{ width: "100%", aspectRatio: 3.0, margin: "auto" }}
                 responsive
-                data={recentRecords}
+                data={sensors1h}
               >
                 <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
                 <XAxis
@@ -131,7 +162,7 @@ export function DevicePage({ devices, records }: DeviceProperties) {
                   tick={{ fontSize: 10 }}
                 />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
+                <Tooltip contentStyle={{color:"black"}} />
                 <Area
                   type="monotone"
                   dataKey="power"
@@ -158,7 +189,7 @@ export function DevicePage({ devices, records }: DeviceProperties) {
               <AreaChart
                 style={{ width: "100%", aspectRatio: 5.0, margin: "auto" }}
                 responsive
-                data={recentRecords}
+                data={sensors24h}
               >
                 <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
                 <XAxis
@@ -169,7 +200,7 @@ export function DevicePage({ devices, records }: DeviceProperties) {
                   tick={{ fontSize: 10 }}
                 />
                 <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip />
+                <Tooltip contentStyle={{color:"black"}} />
                 <Area
                   type="monotone"
                   dataKey="power"

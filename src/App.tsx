@@ -2,7 +2,7 @@ import "./App.scss";
 
 import { useEffect, useState } from "react";
 import SensorEvent from "./api/types/sensor.ts";
-import Device from "./api/types/device.ts";
+import DeviceEvent from "./api/types/device.ts";
 import HttpApi from "./api/http.ts";
 import {DevicePage} from "./page/device-page.tsx"
 import useWebSocket from "react-use-websocket"
@@ -11,6 +11,7 @@ import {BrowserRouter, Routes, Route, } from "react-router-dom";
 import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 import Menu from "./page/menu.tsx";
 import { DashboardPage } from "./page/dashboard.tsx";
+import DeviceControlPage from "./page/device-control-page.tsx";
 
 const localStorageField = "jwt";
 
@@ -57,12 +58,11 @@ function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
   useEffect(() => {
     if (lastMessage !== null) {
       const parsed = JSON.parse(lastMessage.data);
+
       if (parsed.channel === 'sensor') {
         const exact = new SensorEvent(parsed.body);
-
-        
             for (const device of devices) {
-              if (device.id === parsed.body.deviceId) {
+              if (device.id === exact.deviceId) {
                 device.state.current = exact.current;
                 device.state.voltage = exact.voltage;
                 device.state.power = exact.power;
@@ -73,16 +73,28 @@ function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
 
             return;
       } 
+      
+      if (parsed.channel === 'state') {
+          const exact = new DeviceEvent(parsed.body);
+
+          const newDevices = devices.map((device: DeviceEvent): DeviceEvent => {
+            return device.id === exact.id ? exact : device;
+          });
+
+          setDevices(newDevices)
+
+          return;
+      } 
       console.warn("unkown type", parsed)
     }
   }, [lastMessage]);
 
-  const [devices, setDevices] = useState<Device[]>([]);
+  const [devices, setDevices] = useState<DeviceEvent[]>([]);
   const [records, setRecords] = useState<SensorEvent[]>([]);
 
   useEffect(() => {
     api.devices().then((devices) => {
-      devices.sort((a: Device, b:Device) => (a.id > b.id) ? 1 : -1)
+      devices.sort((a: DeviceEvent, b:DeviceEvent) => (a.name > b.name) ? 1 : -1)
       setDevices(devices);
     });
 
@@ -100,8 +112,9 @@ function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
 
                 <div className="col-md-9">
                     <Routes>
-                    <Route path="/" element={<DashboardPage devices={devices}/>} />
-                    <Route path="/device/:id" element={<DevicePage devices={devices} records={records} />}/>
+                      <Route index path="/" element={<DashboardPage devices={devices}/>} />
+                      <Route path="/device/:id" element={<DevicePage devices={devices} records={records} />}/>
+                      <Route path="/device/:id/control" element={<DeviceControlPage devices={devices} api={api} />}/>
                     </Routes>
                 </div>
             </div>

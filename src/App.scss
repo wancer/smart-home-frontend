@@ -1,38 +1,11 @@
-/*
-html {
-  margin: 20px 0 20px 0;
-  padding: 0;
-  width: 100%;
-  text-align: center;
-}
+@import "~bootstrap/scss/bootstrap";
 
-.centre-container {
-  width: 1200px;
-  margin: 0 auto;
-}
-
-thead tr th {
-  text-align: center;
-}
-
-.main-table tr.success td {
-  background-color: var(--bs-success);
-  color: var(--bs-success-bg-subtle);
-}
-
-.main-table tbody td {
-  text-align: right;
-  font-family: monospace, monospace;
-}
-
-
-
-
-
-*/
+@import "@fortawesome/fontawesome-free/css/all.css";
 
 html {
   height: 100%;
+  width: 100%;
+  margin: 20px 0 20px 0;
 }
 
 body {
@@ -50,3 +23,6 @@ body {
   height: 100%;
 }
 
+.sidebar {
+  white-space: nowrap;
+}

@@ -10,11 +10,13 @@ type MenuProperties = {
 
 export default function Menu({ devices }: MenuProperties) {
   return (
+    <div className="sidebar-sticky">
         <ul className="nav flex-column"> 
             <li className="nav-item">
                 <Link to={"/"} className="nav-link"> <i className={"fa-solid fa-gauge"}></i> Dashboard </Link>
             </li>
             {devices.map((device: DeviceEvent) => MenuRow(device))}
         </ul>
+      </div>
   );
 }

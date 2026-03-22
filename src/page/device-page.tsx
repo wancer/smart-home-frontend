@@ -42,7 +42,65 @@ export function DevicePage({ devices, records }: DeviceProperties) {
     return <></>
   }
 
+  return (
+    <>
+      <div className="row">
+        <h2>
+          <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i> 
+          {device.name}
+          
+          <Link to={"/device/" + device.id + "/control"} className=""> 
+            <i className={"fa fa-cog text-primary"}></i> 
+          </Link>
+        </h2>
+      </div>
 
+      <div className="row">
+        <ChartRealtime device={device} />
+      </div>
+        
+      <div className="row">
+        <ChartLast1h device={device} records={records} />
+      </div>
+        
+      <div className="row">
+        <ChartLast24h device={device} records={records} />
+      </div>
+    </>
+  );
+}
+
+type ChartRealtimeProperties = {
+  device: DeviceEvent
+}
+
+function ChartRealtime({device}: ChartRealtimeProperties) {
+  return <>
+      <div className="row">
+        <h2>
+          <strong>Realtime Usage</strong>
+        </h2>
+      </div>
+      <div className="row font-monospace" style={{textAlign: "right"}}>
+        <div className="col-md-8">
+          <h1>
+              <strong> {device.state.power} W </strong>
+              <br/>
+              <strong> {device.state.current} A </strong>
+              <br/>
+              <strong> {device.state.voltage} V </strong>
+          </h1>
+        </div>
+      </div>
+    </>
+}
+
+type ChartLast1hProperties = {
+  device: DeviceEvent
+  records: SensorEvent[]
+}
+
+function ChartLast1h({device, records}: ChartLast1hProperties) { 
   const sensors1h = records
     .filter((r: SensorEvent) => r.deviceId === device.id)
     .sort((a: SensorEvent, b: SensorEvent) => a.deviceTime - b.deviceTime)
@@ -65,6 +123,44 @@ export function DevicePage({ devices, records }: DeviceProperties) {
       };
     });
 
+  return <>
+          <div className="row">
+            <h2>
+              <strong>1h</strong>
+            </h2>
+            <div className="clearfix"></div>
+          </div>
+          <div className="row">
+            <AreaChart
+              style={{ width: "100%", aspectRatio: 3.0, margin: "auto" }}
+              responsive
+              data={sensors1h}
+            >
+              <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
+              <XAxis
+                dataKey="axisText"
+                angle={45}
+                textAnchor="middle"
+                height={100}
+                tick={{ fontSize: 10 }}
+              />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{color:"black"}} />
+              <Area
+                type="monotone"
+                dataKey="power"
+                stroke="#075a01"
+                fill="#00d515"
+                name="Power (W)"
+                animationDuration={0}
+              />
+            </AreaChart>
+          </div>
+      </>
+}
+
+
+function ChartLast24h ({device, records}: ChartLast1hProperties) {
   const sensors24h = records
     .filter((r: SensorEvent) => r.deviceId === device.id)
     .sort((a: SensorEvent, b: SensorEvent) => a.deviceTime - b.deviceTime)
@@ -86,136 +182,79 @@ export function DevicePage({ devices, records }: DeviceProperties) {
         power: a.power,
       };
     });
-    /*
-  const CustomTooltip = ({ active, payload, label }: TooltipContentProps) => {
-    if (payload.length > 0) {
-      const data = payload[0].payload;
-      return <>{data.tooltipText}</>;
-    }
-    return <>dsadas</>;
-  };*/
 
-  return (
-    <>
-      <div className="row">
-        
-        <h2>
-          <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i> 
-          {device.name}
-          
-          <Link to={"/device/" + device.id + "/control"} className=""> 
-            <i className={"fa fa-cog text-primary"}></i> 
-          </Link>
-        </h2>
-      </div>
-      <div className="row">
-        <div className="col-md-4 col-sm-4 col-xs-12">
-          <div className="x_panel tile">
-            <div className="x_title">
-              <h2>
-                <strong>Realtime Usage</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content">
-              <div className="row">
-                <h1 className="text-center">
-                  <strong id="rtu-power">{device.state.power} W</strong>
-                </h1>
-              </div>
-              <div className="row">
-                <div className="col-md-6 col-xs-6 text-center">
-                  <h1>
-                  <strong id="rtu-power">{device.state.current} A</strong>
-                  </h1>
-                </div>
-                <div className="col-md-6 col-xs-6 text-center">
-                  <h1>
-                  <strong id="rtu-power">{device.state.voltage} V</strong>
-                  </h1>
-                </div>
-              </div>
-            </div>
+
+  return <>
+          <div className="row">
+            <h2>
+              <strong>24h</strong>
+            </h2>
+            <div className="clearfix"></div>
           </div>
-        </div>
+          <div className="row">
+            <AreaChart
+              style={{ width: "100%", aspectRatio: 3.0, margin: "auto" }}
+              responsive
+              data={sensors24h}
+            >
+              <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
+              <XAxis
+                dataKey="axisText"
+                angle={45}
+                textAnchor="middle"
+                height={100}
+                tick={{ fontSize: 10 }}
+              />
+              <YAxis tick={{ fontSize: 10 }} />
+              <Tooltip contentStyle={{color:"black"}} />
+              <Area
+                type="monotone"
+                dataKey="power"
+                stroke="#075a01"
+                fill="#00d515"
+                name="Power (W)"
+                animationDuration={0}
+              />
+            </AreaChart>
+      </div>
+    </>
+}
 
+
+function ChartLast30days () {
+  return <div className="row">
         <div className="col-md-8 col-sm-8 col-xs-12">
           <div className="x_panel tile">
             <div className="x_title">
               <h2>
-                <strong>Realtime Trend</strong>
+                <strong>Last 30 days (kWH)</strong>
               </h2>
               <div className="clearfix"></div>
             </div>
             <div className="x_content">
-              <AreaChart
-                style={{ width: "100%", aspectRatio: 3.0, margin: "auto" }}
-                responsive
-                data={sensors1h}
-              >
-                <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
-                <XAxis
-                  dataKey="axisText"
-                  angle={45}
-                  textAnchor="middle"
-                  height={100}
-                  tick={{ fontSize: 10 }}
-                />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{color:"black"}} />
-                <Area
-                  type="monotone"
-                  dataKey="power"
-                  stroke="#075a01"
-                  fill="#00d515"
-                  name="Power (W)"
-                  animationDuration={0}
-                />
-              </AreaChart>
+              <canvas id="du-chart" height="270"></canvas>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="row">
-        <div className="col-md-12 col-sm-12 col-xs-12">
+        <div className="col-md-4 col-sm-4 col-xs-12">
           <div className="x_panel tile">
             <div className="x_title">
               <h2>
-                <strong>Logged Usage (24h)</strong>
+                <strong>Last 12 months (kWH)</strong>
               </h2>
+              <div className="clearfix"></div>
             </div>
             <div className="x_content">
-              <AreaChart
-                style={{ width: "100%", aspectRatio: 5.0, margin: "auto" }}
-                responsive
-                data={sensors24h}
-              >
-                <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
-                <XAxis
-                  dataKey="axisText"
-                  angle={45}
-                  textAnchor="middle"
-                  height={100}
-                  tick={{ fontSize: 10 }}
-                />
-                <YAxis tick={{ fontSize: 10 }} />
-                <Tooltip contentStyle={{color:"black"}} />
-                <Area
-                  type="monotone"
-                  dataKey="power"
-                  stroke="#075a01"
-                  fill="#00d515"
-                  name="Power (W)"
-                  animationDuration={0}
-                />
-              </AreaChart>
+              <canvas id="mu-chart" height="270"></canvas>
             </div>
           </div>
         </div>
       </div>
+}
 
-      <div className="row">
+function MiddleRow() {
+  return <div className="row">
         <div className="col-md-4 col-sm-4 col-xs-12 col-lg-4 col-xl-2">
           <div className="x_panel small tile">
             <div className="x_title">
@@ -310,39 +349,11 @@ export function DevicePage({ devices, records }: DeviceProperties) {
           </div>
         </div>
       </div>
+}
 
-      <div className="row">
-        <div className="col-md-8 col-sm-8 col-xs-12">
-          <div className="x_panel tile">
-            <div className="x_title">
-              <h2>
-                <strong>Last 30 days (kWH)</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content">
-              <canvas id="du-chart" height="270"></canvas>
-            </div>
-          </div>
-        </div>
 
-        <div className="col-md-4 col-sm-4 col-xs-12">
-          <div className="x_panel tile">
-            <div className="x_title">
-              <h2>
-                <strong>Last 12 months (kWH)</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content">
-              <canvas id="mu-chart" height="270"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-
-        
-        <footer>
+function Footer() {
+  return <footer>
           <ul className="list-inline">
             <li>
               <strong>Device name:</strong> device.name
@@ -357,7 +368,5 @@ export function DevicePage({ devices, records }: DeviceProperties) {
               <strong>Hw ver:</strong> device.hardwareVersion
             </li>
           </ul>
-        </footer>
-    </>
-  );
+        </footer> 
 }

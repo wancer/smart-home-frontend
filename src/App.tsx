@@ -19,7 +19,10 @@ type AuthorizedUserAppProperties = {
 
 export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
   const [socketUrl] = useState(import.meta.env.VITE_API_URL +'/api/ws?jwt=' + api.token);
-  const { lastMessage } = useWebSocket(socketUrl);
+  const { lastMessage } = useWebSocket(
+    socketUrl,
+    { protocols: ["Authorization", api.token] }
+  );
 
   useEffect(() => {
     if (lastMessage !== null) {
@@ -42,13 +45,11 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
       
       if (parsed.channel === 'state') {
           const exact = new DeviceEvent(parsed.body);
-
-          const newDevices = devices.map((device: DeviceEvent): DeviceEvent => {
-            return device.id === exact.id ? exact : device;
-          });
-
-          setDevices(newDevices)
-
+          for (const device of devices) {
+            if (device.id === exact.id) {
+              device.state = exact.state;
+            }
+          }
           return;
       } 
       console.warn("unkown type", parsed)

@@ -13,9 +13,9 @@ type DeviceProperties = {
 };
 
 function GetById(devices: DeviceEvent[], id: number): DeviceEvent | null {
-  for (const device of devices) {
-    if (device.id === id) {
-      return device;
+  for (const idx in devices) {
+    if (devices[idx].id === id) {
+      return devices[idx];
     }
   }
   return null;
@@ -35,20 +35,27 @@ export default function DeviceControlPage({ devices, api }: DeviceProperties) {
   }
 
   const id = parseInt(idRaw);
-  const device = GetById(devices, id);
+  let device = GetById(devices, id);
   if (!device) {
     return <></>;
   }
 
+  const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
   const switchOnOff = async () => {
     setInProgress(true);
     await api.control(device.id, "on-off", device.state.on ? "OFF" : "ON");
+    await delay(1 * 1000); // waiting for WS event after BE logic
+    setVoltageState(device.state.voltage);
+    setPowerState(device.state.power);
     setInProgress(false);
   };
 
   const setVoltage = async () => {
     setInProgress(true);
     await api.control(device.id, "voltage", voltageState.toString());
+    await delay(1 * 1000); // waiting for WS event after BE logic
+    setVoltageState(device.state.voltage);
     setInProgress(false);
   };
 
@@ -59,6 +66,8 @@ export default function DeviceControlPage({ devices, api }: DeviceProperties) {
   const setPower = async () => {
     setInProgress(true);
     await api.control(device.id, "power", powerState.toString());
+    await delay(1 * 1000); // waiting for WS event after BE logic
+    setPowerState(device.state.power);
     setInProgress(false);
   };
   if (Number.isNaN(powerState)) { // initial value

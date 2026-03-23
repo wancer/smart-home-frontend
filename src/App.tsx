@@ -7,6 +7,7 @@ import HttpApi from "./api/http.ts";
 import {DevicePage} from "./page/device-page.tsx"
 import useWebSocket from "react-use-websocket"
 import {BrowserRouter, Routes, Route, } from "react-router-dom";
+import { Container, Row } from 'react-bootstrap';
 
 import Menu from "./page/menu.tsx";
 import { DashboardPage } from "./page/dashboard.tsx";
@@ -69,11 +70,9 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
   }, []);
 
   return <BrowserRouter>
-        <div className="container-fluid">
-            <div className="row">
-                <nav className="col-md-2 d-none d-md-block sidebar">
-                    <Menu devices={devices} />
-                </nav>
+        <Container fluid>
+            <Row>
+                <Menu devices={devices} />
 
                 <main className="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4" role="main">
                   <div className="justify-content-between align-items-center border-bottom">
@@ -84,7 +83,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
                     </Routes>
                   </div>
                 </main>
-            </div>
-        </div>
+            </Row>
+        </Container>
     </BrowserRouter>;
 }

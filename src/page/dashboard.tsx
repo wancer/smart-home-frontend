@@ -6,11 +6,9 @@ type DashboardProperties = {
   devices: DeviceEvent[];
 };
 
-function DeviceBlock(
-  device: DeviceEvent,
-) {
+function DeviceBlock(device: DeviceEvent) {
   return (
-    <div className="col-md-6 col-sm-6 col-xs-12">
+    <div className="col-md-6 col-sm-6 col-xs-12" key={"dashboard-block-" + device.id}>
       <div className="row">
         <h2>
           <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i> 

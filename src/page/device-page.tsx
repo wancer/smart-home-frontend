@@ -1,16 +1,10 @@
 'use client';
 
 import { useParams, Link } from "react-router-dom";
-import DeviceEvent from "../api/types/device.ts";
-import {
-  AreaChart,
-  Area,
-  CartesianGrid,
-  XAxis,
-  YAxis,
-  Tooltip,
-} from "recharts";
+import { DateTime } from "luxon";
+import { AreaChart, Area,  CartesianGrid,  XAxis, YAxis, Tooltip, } from "recharts";
 
+import DeviceEvent from "../api/types/device.ts";
 import SensorEvent from "../api/types/sensor.ts"
 
 type DeviceProperties = {
@@ -42,6 +36,10 @@ export function DevicePage({ devices, records }: DeviceProperties) {
     return <></>
   }
 
+  const recordsFiltered = records
+    .filter((r: SensorEvent) => r.deviceId === device.id)
+    .sort((a: SensorEvent, b: SensorEvent) => a.deviceTime - b.deviceTime)
+
   return (
     <>
       <div className="row">
@@ -60,11 +58,11 @@ export function DevicePage({ devices, records }: DeviceProperties) {
       </div>
         
       <div className="row">
-        <ChartLast1h device={device} records={records} />
+        <ChartRow title="1h" records={recordsFiltered} from={ DateTime.now().setZone("UTC") } till={ DateTime.now().minus({hour: 1}).setZone("UTC") } />
       </div>
         
       <div className="row">
-        <ChartLast24h device={device} records={records} />
+        <ChartRow title="24h" records={recordsFiltered} from={ DateTime.now().setZone("UTC") } till={ DateTime.now().minus({day: 1}).setZone("UTC") } />
       </div>
     </>
   );
@@ -95,38 +93,75 @@ function ChartRealtime({device}: ChartRealtimeProperties) {
     </>
 }
 
-type ChartLast1hProperties = {
-  device: DeviceEvent
-  records: SensorEvent[]
+type ChartRowProperties = {
+  title: string,
+  records: SensorEvent[],
+  from: DateTime,
+  till: DateTime,
 }
 
-function ChartLast1h({device, records}: ChartLast1hProperties) { 
-  const sensors1h = records
-    .filter((r: SensorEvent) => r.deviceId === device.id)
-    .sort((a: SensorEvent, b: SensorEvent) => a.deviceTime - b.deviceTime)
-    .slice(0, 4 * 60) // 4 data points per minute
-    .map((a: SensorEvent): object => {
-      const date = new Date(a.deviceTime * 1000);
-      return {
-        axisText: date.getHours() + ":" + date.getMinutes(),
-        tooltipText:
-          date.getFullYear() +
-          "-" +
-          date.getMonth() +
-          "-" +
-          date.getDate() +
-          " " +
-          date.getHours() +
-          ":" +
-          date.getMinutes(),
-        power: a.power,
-      };
-    });
+const updatePeriod = 15;
+
+function ChartRow({title, records, from, till}: ChartRowProperties) { 
+  const fromTimestamp = from.toUnixInteger()
+  const tillTimestamp = till.toUnixInteger()
+
+  let lastTime = tillTimestamp;
+
+  type chartPoint = {
+    axisText: string
+    power: number
+  }
+  const sensors1h: chartPoint[] = []
+  for (const record of records) {
+    if (record.deviceTime > fromTimestamp) {
+      console.log("Time from the future " + fromTimestamp);
+      continue
+    }
+
+    if (record.deviceTime < tillTimestamp) {
+      continue
+    }
+
+    const sinceLastRecord = record.deviceTime - lastTime
+    if (sinceLastRecord > (updatePeriod * 10)) {
+      const missedRecords = sinceLastRecord / updatePeriod;
+      for (let i = 0; i < missedRecords; i++) {
+          let synthRecordTime = lastTime + (i * updatePeriod);
+          if (synthRecordTime < tillTimestamp) {
+            continue
+          }
+          if (synthRecordTime > fromTimestamp) {
+            continue
+          }
+
+          const date = DateTime.fromMillis(synthRecordTime * 1000)
+
+          sensors1h.push({
+              axisText: date.toFormat("HH:mm"),
+              power: 0,
+          })
+      }
+    }
+
+    lastTime = record.deviceTime
+    
+    const date = DateTime.fromMillis(record.deviceTime * 1000)
+    
+    sensors1h.push({
+        axisText: date.toFormat("HH:mm"),
+        power: record.power,
+      })
+  }
+
+  if (sensors1h.length == 0) {
+    return <></>
+  }
 
   return <>
           <div className="row">
             <h2>
-              <strong>1h</strong>
+              <strong>{title}</strong>
             </h2>
             <div className="clearfix"></div>
           </div>
@@ -159,68 +194,7 @@ function ChartLast1h({device, records}: ChartLast1hProperties) {
       </>
 }
 
-
-function ChartLast24h ({device, records}: ChartLast1hProperties) {
-  const sensors24h = records
-    .filter((r: SensorEvent) => r.deviceId === device.id)
-    .sort((a: SensorEvent, b: SensorEvent) => a.deviceTime - b.deviceTime)
-    .slice(0, 4 * 60 * 24) // 4 data points per minute
-    .map((a: SensorEvent): object => {
-      const date = new Date(a.deviceTime * 1000);
-      return {
-        axisText: date.getHours() + ":" + date.getMinutes(),
-        tooltipText:
-          date.getFullYear() +
-          "-" +
-          date.getMonth() +
-          "-" +
-          date.getDate() +
-          " " +
-          date.getHours() +
-          ":" +
-          date.getMinutes(),
-        power: a.power,
-      };
-    });
-
-
-  return <>
-          <div className="row">
-            <h2>
-              <strong>24h</strong>
-            </h2>
-            <div className="clearfix"></div>
-          </div>
-          <div className="row">
-            <AreaChart
-              style={{ width: "100%", aspectRatio: 3.0, margin: "auto" }}
-              responsive
-              data={sensors24h}
-            >
-              <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
-              <XAxis
-                dataKey="axisText"
-                angle={45}
-                textAnchor="middle"
-                height={100}
-                tick={{ fontSize: 10 }}
-              />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{color:"black"}} />
-              <Area
-                type="monotone"
-                dataKey="power"
-                stroke="#075a01"
-                fill="#00d515"
-                name="Power (W)"
-                animationDuration={0}
-              />
-            </AreaChart>
-      </div>
-    </>
-}
-
-
+/*
 function ChartLast30days () {
   return <div className="row">
         <div className="col-md-8 col-sm-8 col-xs-12">
@@ -370,3 +344,4 @@ function Footer() {
           </ul>
         </footer> 
 }
+        */

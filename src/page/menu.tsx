@@ -1,15 +1,25 @@
 "use client";
 
 import { Link } from "react-router-dom";
-import { useState } from "react";
+import { MouseEventHandler, useState } from "react";
 import {Nav, Button, Offcanvas} from "react-bootstrap";
 
 import DeviceEvent from "../api/types/device";
-import { MenuRow } from "./menu-row";
 
 type MenuProperties = {
   devices: DeviceEvent[];
 };
+
+function MenuRow(device: DeviceEvent, key: string, onClick: MouseEventHandler<HTMLAnchorElement>) {
+  return (
+    <li key={key}>
+      <Link to={"/device/" + device.id} className="nav-link" onClick={ onClick }>
+        <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i> 
+        {device.name}
+      </Link>
+    </li>
+  );
+}
 
 export default function Menu({ devices }: MenuProperties) {
 
@@ -28,7 +38,7 @@ export default function Menu({ devices }: MenuProperties) {
               <i className={"fa-solid fa-gauge"}></i> Dashboard 
             </Link>
           </li>
-          {devices.map((device: DeviceEvent) => MenuRow(device, "menu-device-big-" + device.id))}
+          {devices.map((device: DeviceEvent) => MenuRow(device, "menu-device-big-" + device.id, () => {}))}
         </ul>
       </div>
     </Nav>
@@ -47,11 +57,11 @@ export default function Menu({ devices }: MenuProperties) {
             <div className="sidebar-sticky">
               <ul className="nav flex-column">
                 <li className="nav-item">
-                  <Link to={"/"} className="nav-link">
+                  <Link to={"/"} className="nav-link" onClick={handleClose}>
                     <i className={"fa-solid fa-gauge"}></i> Dashboard 
                   </Link>
                 </li>
-                {devices.map((device: DeviceEvent) => MenuRow(device, "menu-device-small-" + device.id))}
+                {devices.map((device: DeviceEvent) => MenuRow(device, "menu-device-big-" + device.id, handleClose))}            
               </ul>
             </div>
           </Nav>

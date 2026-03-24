@@ -1,329 +1,277 @@
-'use client';
+"use client";
 
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-import { DateTime } from "luxon";
-import { AreaChart, Area,  CartesianGrid,  XAxis, YAxis, Tooltip, } from "recharts";
+
+import {
+  Chart as ChartJS,
+  LineController,
+  LinearScale,
+  CategoryScale,
+  BarController,
+  BarElement,
+  PointElement,
+  LineElement,
+  Filler,
+  Legend,
+  Title,
+  Tooltip,
+} from "chart.js";
+
+import { Bar } from "react-chartjs-2";
+
+ChartJS.register(
+  LineController,
+  LinearScale,
+  CategoryScale,
+  BarController,
+  BarElement,
+  PointElement,
+  LineElement,
+  Legend,
+  Tooltip,
+  Filler,
+  Title,
+);
 
 import DeviceEvent from "../api/types/device.ts";
-import SensorEvent from "../api/types/sensor.ts"
+import HttpApi from "../api/http.ts";
+import SensorDailyEvent from "../api/types/sensor-daily.ts";
+import SensorEventStat from "../api/types/sensor-event-stat.ts";
+import { Col } from "react-bootstrap";
 
 type DeviceProperties = {
-  devices: DeviceEvent[];
-  records: any;
+  api: HttpApi;
 };
 
-function GetById(devices: DeviceEvent[], id: number): DeviceEvent|null {
-  for (const device of devices) {
-    if (device.id === id) {
-      return device;
-    }
-  }
-  return null;
-}
+export function DevicePage({ api }: DeviceProperties) {
+  const { idStr } = useParams();
+  const deviceId = typeof idStr === "undefined" ? 0 : +idStr;
 
-export function DevicePage({ devices, records }: DeviceProperties) {
-  const { id: idRaw } = useParams();
-  if (typeof idRaw === "undefined") {
-    return <></>;
-  }
-  if (devices.length === 0) {
-    return <></>;
-  }
+  const [isLoading, setLoading] = useState(true); // Loading state
+  const [device, setDevice] = useState<DeviceEvent>(new DeviceEvent({ state: {} }));
+  const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[]>([]);
+  const [events7day, setEvents7day] = useState<SensorEventStat[]>([]);
+  const [events5min, setEvents5min] = useState<SensorEventStat[]>([]);
+  const [events1min, setEvents1min] = useState<SensorEventStat[]>([]);
 
-  const id = parseInt(idRaw);
-  const device = GetById(devices, id);
-  if (!device) {
-    return <></>
-  }
+  useEffect(() => {
+    api.device(deviceId).then((device) => {
+      setDevice(device);
+      setLoading(false);
+    });
 
-  const recordsFiltered = records
-    .filter((r: SensorEvent) => r.deviceId === device.id)
-    .sort((a: SensorEvent, b: SensorEvent) => a.deviceTime - b.deviceTime)
+    api.sensorsDaily(deviceId).then(setEventsMonthly);
+    api.sensorsConfigurable(deviceId, (7 * 24) + "h", "1h").then(setEvents7day);
+    api.sensorsConfigurable(deviceId, "24h", "5m").then(setEvents5min);
+    api.sensorsConfigurable(deviceId, "1h", "1m").then(setEvents1min);
+  }, [deviceId]);
+
+  useEffect(() => {
+    
+  }, [device]);
+
+  if (isLoading) {
+    return <>Loading...</>;
+  }
 
   return (
     <>
       <div className="row">
         <h2>
-          <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i> 
+          <i
+            className={
+              "fa fa-plug " + (device.state.on ? "text-success" : "text-danger")
+            }
+          ></i>
           {device.name}
-          
-          <Link to={"/device/" + device.id + "/control"} className=""> 
-            <i className={"fa fa-cog text-primary"}></i> 
+
+          <Link to={"/device/" + device.id + "/control"} className="">
+            <i className={"fa fa-cog text-primary"}></i>
           </Link>
         </h2>
       </div>
 
       <div className="row">
-        <ChartRealtime device={device} />
+        <RealtimeTable device={device} />
       </div>
-        
+
       <div className="row">
-        <ChartRow title="1h" records={recordsFiltered} from={ DateTime.now().setZone("UTC") } till={ DateTime.now().minus({hour: 1}).setZone("UTC") } />
+        <div className="row">
+          <h2>
+            <strong>Power 1h / 1m</strong>
+          </h2>
+        </div>
+        <ChartPower events={events1min} />
       </div>
-        
+
       <div className="row">
-        <ChartRow title="24h" records={recordsFiltered} from={ DateTime.now().setZone("UTC") } till={ DateTime.now().minus({day: 1}).setZone("UTC") } />
+        <div className="row">
+          <h2>
+            <strong>Consumption 24h / 5min</strong>
+          </h2>
+        </div>
+        <ChartConsumption events={events5min} />
+      </div>
+
+      <div className="row">
+        <div className="row">
+          <h2>
+            <strong>Power 24h / 5min</strong>
+          </h2>
+        </div>
+        <ChartPower events={events5min} />
+      </div>
+
+      <div className="row">
+        <div className="row">
+          <h2>
+            <strong>Electricity on/off 24h / 5min</strong>
+          </h2>
+        </div>
+        <ChartElectricityOnOff events={events5min} />
+      </div>
+
+      <div className="row">
+        <div className="row">
+          <h2>
+            <strong>Consumption W*h 7d / 1h</strong>
+          </h2>
+        </div>
+        <ChartConsumption events={events7day} />
+      </div>
+
+      <div className="row">
+        <div className="row">
+          <h2>
+            <strong>Consumption W*h 30d / 1d</strong>
+          </h2>
+        </div>
+        <ChartDailyConsumption dailyEvents={eventsMonthly} />
       </div>
     </>
   );
 }
 
 type ChartRealtimeProperties = {
-  device: DeviceEvent
-}
+  device: DeviceEvent;
+};
 
-function ChartRealtime({device}: ChartRealtimeProperties) {
-  return <>
-      <div className="row">
-        <h2>
-          <strong>Realtime Usage</strong>
-        </h2>
-      </div>
-      <div className="row font-monospace" style={{textAlign: "right"}}>
-        <div className="col-md-8">
-          <h1>
-              <strong> {device.state.power} W </strong>
-              <br/>
-              <strong> {device.state.current} A </strong>
-              <br/>
-              <strong> {device.state.voltage} V </strong>
-          </h1>
-        </div>
+function RealtimeTable({ device }: ChartRealtimeProperties) {
+  return (
+    <>
+      <div className="row font-monospace">
+        <Col xs={4}>
+        <h1><strong> {device.state.power} W </strong></h1>
+        </Col>
+        <Col xs={4}>
+        <h1><strong> {device.state.current} A </strong></h1>
+        </Col>
+        <Col xs={4}>
+        <h1><strong> {device.state.voltage} V </strong></h1>
+        </Col>
       </div>
     </>
+  );
 }
 
-type ChartRowProperties = {
-  title: string,
-  records: SensorEvent[],
-  from: DateTime,
-  till: DateTime,
+type DailyChartProperties = {
+  dailyEvents: SensorDailyEvent[],
+};
+
+function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
+  const data = {
+    labels: dailyEvents.map((dailyEvent) => dailyEvent.date),
+    datasets: [
+      {
+        label: "W*h",
+        borderColor: "rgb(53, 0, 123)",
+        backgroundColor: "rgba(157, 0, 255, 0.5)",
+        fill: true,
+        data: dailyEvents.map((dailyEvent) => dailyEvent.power),
+      },
+    ],
+  };
+  const options = {
+    responsive: true,
+    animation: {
+      duration: 0,
+    },
+  };
+
+  return <Bar data={data} options={options} />;
 }
 
-const updatePeriod = 15;
+function ChartElectricityOnOff({ events }: {events: SensorEventStat[]}) {
+  const data = {
+    labels: events.map((record) => record.time),
+    datasets: [
+      {
+        label: "On",
+        borderColor: "rgb(4, 123, 0)",
+        backgroundColor: "rgba(47, 255, 0, 0.5)",
+        fill: true,
+        data: events.map((record) => record.currentAvg === null ? 0 : 1),
+      },
+    ],
+  };
+  const options = {
+    responsive: true,
+    animation: {
+      duration: 0,
+    },
+  };
 
-function ChartRow({title, records, from, till}: ChartRowProperties) { 
-  const fromTimestamp = from.toUnixInteger()
-  const tillTimestamp = till.toUnixInteger()
+  return <Bar data={data} options={options} />;
+}
 
-  let lastTime = tillTimestamp;
+function ChartConsumption({ events }: {events: SensorEventStat[]}) {
+  const data = {
+    labels: events.map((record) => record.time),
+    datasets: [
+      {
+        label: "W*h",
+        borderColor: "rgb(53, 0, 123)",
+        backgroundColor: "rgba(157, 0, 255, 0.5)",
+        fill: true,
+        data: events.map((record) => record.powerConsumed),
+      },
+    ],
+  };
+  const options = {
+    responsive: true,
+    animation: {
+      duration: 0,
+    },
+  };
 
-  type chartPoint = {
-    axisText: string
-    power: number
-  }
-  const sensors1h: chartPoint[] = []
-  for (const record of records) {
-    if (record.deviceTime > fromTimestamp) {
-      console.log("Time from the future " + fromTimestamp);
-      continue
-    }
+  return <Bar data={data} options={options} />;
+}
 
-    if (record.deviceTime < tillTimestamp) {
-      continue
-    }
+function ChartPower({ events }: {events: SensorEventStat[]}) {
+  const data = {
+    labels: events.map((record) => record.time),
+    datasets: [
+      {
+        label: "W",
+        borderColor: "rgb(123, 0, 0)",
+        backgroundColor: "rgba(255, 0, 0, 0.5)",
+        fill: true,
+        data: events.map((record) => record.powerAvg),
+      },
+    ],
+  };
+  const options = {
+    responsive: true,
+    animation: {
+      duration: 0,
+    },
+  };
 
-    const sinceLastRecord = record.deviceTime - lastTime
-    if (sinceLastRecord > (updatePeriod * 10)) {
-      const missedRecords = sinceLastRecord / updatePeriod;
-      for (let i = 0; i < missedRecords; i++) {
-          let synthRecordTime = lastTime + (i * updatePeriod);
-          if (synthRecordTime < tillTimestamp) {
-            continue
-          }
-          if (synthRecordTime > fromTimestamp) {
-            continue
-          }
-
-          const date = DateTime.fromMillis(synthRecordTime * 1000)
-
-          sensors1h.push({
-              axisText: date.toFormat("HH:mm"),
-              power: 0,
-          })
-      }
-    }
-
-    lastTime = record.deviceTime
-    
-    const date = DateTime.fromMillis(record.deviceTime * 1000)
-    
-    sensors1h.push({
-        axisText: date.toFormat("HH:mm"),
-        power: record.power,
-      })
-  }
-
-  if (sensors1h.length == 0) {
-    return <></>
-  }
-
-  return <>
-          <div className="row">
-            <h2>
-              <strong>{title}</strong>
-            </h2>
-            <div className="clearfix"></div>
-          </div>
-          <div className="row">
-            <AreaChart
-              style={{ width: "100%", aspectRatio: 3.0, margin: "auto" }}
-              responsive
-              data={sensors1h}
-            >
-              <CartesianGrid stroke="#ccc" strokeDasharray="5 5" />
-              <XAxis
-                dataKey="axisText"
-                angle={45}
-                textAnchor="middle"
-                height={100}
-                tick={{ fontSize: 10 }}
-              />
-              <YAxis tick={{ fontSize: 10 }} />
-              <Tooltip contentStyle={{color:"black"}} />
-              <Area
-                type="monotone"
-                dataKey="power"
-                stroke="#075a01"
-                fill="#00d515"
-                name="Power (W)"
-                animationDuration={0}
-              />
-            </AreaChart>
-          </div>
-      </>
+  return <Bar data={data} options={options} />;
 }
 
 /*
-function ChartLast30days () {
-  return <div className="row">
-        <div className="col-md-8 col-sm-8 col-xs-12">
-          <div className="x_panel tile">
-            <div className="x_title">
-              <h2>
-                <strong>Last 30 days (kWH)</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content">
-              <canvas id="du-chart" height="270"></canvas>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-4 col-sm-4 col-xs-12">
-          <div className="x_panel tile">
-            <div className="x_title">
-              <h2>
-                <strong>Last 12 months (kWH)</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content">
-              <canvas id="mu-chart" height="270"></canvas>
-            </div>
-          </div>
-        </div>
-      </div>
-}
-
-function MiddleRow() {
-  return <div className="row">
-        <div className="col-md-4 col-sm-4 col-xs-12 col-lg-4 col-xl-2">
-          <div className="x_panel small tile">
-            <div className="x_title">
-              <h2>
-                <strong>Plug state</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content small">
-              <h1>
-                <span id="power-state">-</span>
-              </h1>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-4 col-sm-4 col-xs-12 col-lg-4 col-xl-2">
-          <div className="x_panel small tile">
-            <div className="x_title">
-              <h2>
-                <strong>Uptime</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content small">
-              <h1 id="uptime">-</h1>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-4 col-sm-4 col-xs-12 col-lg-4 col-xl-2">
-          <div className="x_panel small tile">
-            <div className="x_title">
-              <h2>
-                <strong>Total today</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content small">
-              <h1>
-                <span id="total-day">-</span> <small>kWH</small>
-              </h1>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-4 col-sm-4 col-xs-12 col-lg-4 col-xl-2">
-          <div className="x_panel small tile">
-            <div className="x_title">
-              <h2>
-                <strong>Total this month</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content small">
-              <h1>
-                <span id="total-month">-</span> <small>kWH</small>
-              </h1>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-4 col-sm-4 col-xs-12 col-lg-4 col-xl-2">
-          <div className="x_panel small tile">
-            <div className="x_title">
-              <h2>
-                <strong>Daily avg</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content small">
-              <h1>
-                <span id="avg-day">-</span> <small>kWH</small>
-              </h1>
-            </div>
-          </div>
-        </div>
-
-        <div className="col-md-4 col-sm-4 col-xs-12 col-lg-4 col-xl-2">
-          <div className="x_panel small tile">
-            <div className="x_title">
-              <h2>
-                <strong>Monthly avg</strong>
-              </h2>
-              <div className="clearfix"></div>
-            </div>
-            <div className="x_content small">
-              <h1>
-                <span id="avg-month">-</span> <small>kWH</small>
-              </h1>
-            </div>
-          </div>
-        </div>
-      </div>
-}
 
 
 function Footer() {

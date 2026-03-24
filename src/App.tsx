@@ -79,8 +79,8 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
                   <div className="justify-content-between align-items-center border-bottom">
                     <Routes>
                       <Route index path="/" element={<DashboardPage devices={devices}/>} />
-                      <Route path="/device/:id" element={<DevicePage devices={devices} records={records} />}/>
-                      <Route path="/device/:id/control" element={<DeviceControlPage devices={devices} api={api} />}/>
+                      <Route path="/device/:idStr" element={<DevicePage api={api} />}/>
+                      <Route path="/device/:idStr/control" element={<DeviceControlPage devices={devices} api={api} />}/>
                     </Routes>
                   </div>
                 </main>

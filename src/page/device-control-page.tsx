@@ -59,6 +59,7 @@ export default function DeviceControlPage({ devices, api }: DeviceProperties) {
     setInProgress(false);
   };
 
+  // !!! try useEffect here
   if (Number.isNaN(voltageState)) { // initial value
     setVoltageState(device.state.voltage)
   }

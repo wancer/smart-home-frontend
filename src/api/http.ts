@@ -2,6 +2,8 @@ import DeviceEvent from "./types/device";
 import Login from "./types/login";
 import SensorEvent from "./types/sensor";
 import { CredentialResponse } from '@react-oauth/google';
+import SensorDailyEvent from "./types/sensor-daily";
+import SensorEventStat from "./types/sensor-event-stat";
 
 export default class HttpApi {
 
@@ -29,9 +31,49 @@ export default class HttpApi {
         }
     }
 
+    public async sensorsDaily(deviceId: number): Promise<SensorDailyEvent[]> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/sensors/daily`,
+            {
+                headers: {
+                    'Authorization': 'Bearer ' + this.token,
+                }
+            }
+        );
+        return response.json();
+    }
+
+    public async sensorsConfigurable(deviceId: number, duration: string, scale: string): Promise<SensorEventStat[]> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/sensors/${duration}/${scale}`,
+            {
+                headers: {
+                    'Authorization': 'Bearer ' + this.token,
+                }
+            }
+        );
+        return response.json();
+    }
+
     public async devices(): Promise<DeviceEvent[]> {
         const response = await fetch(
             import.meta.env.VITE_API_URL + '/api/devices',
+            {
+                headers: {
+                    'Authorization': 'Bearer ' + this.token,
+                }
+            }
+        );
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+        const parsed = response.json()
+        return parsed;
+    }
+
+    public async device(deviceId: number): Promise<DeviceEvent> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}`,
             {
                 headers: {
                     'Authorization': 'Bearer ' + this.token,

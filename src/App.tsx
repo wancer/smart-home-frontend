@@ -23,7 +23,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
   const [socketUrl] = useState(import.meta.env.VITE_API_URL +'/api/ws?jwt=' + api.token);
   const { lastMessage } = useWebSocket(
     socketUrl,
-    { protocols: ["Authorization", api.token] }
+    { protocols: api.token }
   );
 
   useEffect(() => {

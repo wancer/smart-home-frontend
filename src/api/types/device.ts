@@ -1,7 +1,7 @@
 'use client';
 
 class DeviceState {
-    public on: boolean;
+    public on: boolean|null;
 	public last: number;
 	public power: number;
     public current: number;

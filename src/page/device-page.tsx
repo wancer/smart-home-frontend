@@ -38,6 +38,7 @@ import DeviceEvent from "../api/types/device.ts";
 import HttpApi from "../api/http.ts";
 import SensorDailyEvent from "../api/types/sensor-daily.ts";
 import SensorEventStat from "../api/types/sensor-event-stat.ts";
+import PowerIcon from "../element/power-icon.tsx";
 
 type DevicePageProperties = {
   api: HttpApi;
@@ -68,11 +69,7 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
     <>
       <div className="row">
         <h2>
-          <i
-            className={
-              "fa fa-plug " + (device.state.on ? "text-success" : "text-danger")
-            }
-          ></i>
+          <PowerIcon device={device}/>
           {device.name}
 
           <Link to={"/device/" + device.id + "/control"} className="">

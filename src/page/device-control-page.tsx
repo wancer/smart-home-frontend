@@ -7,6 +7,7 @@ import {Row, Col, Button, Collapse, Form} from "react-bootstrap";
 import DeviceEvent from "../api/types/device";
 import HttpApi from "../api/http";
 import timezones from './timezones';
+import PowerIcon from "../element/power-icon";
 
 type DeviceControlPageProperties = {
   api: HttpApi;
@@ -80,7 +81,7 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
     <>
       <Row>
         <h2>
-          <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i>
+          <PowerIcon device={device}/>
           {device.name}
         </h2>
       </Row>

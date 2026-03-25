@@ -5,6 +5,7 @@ import { MouseEventHandler, useState } from "react";
 import {Nav, Button, Offcanvas} from "react-bootstrap";
 
 import DeviceEvent from "../api/types/device";
+import PowerIcon from "../element/power-icon";
 
 type MenuProperties = {
   devices: DeviceEvent[];
@@ -13,8 +14,8 @@ type MenuProperties = {
 function MenuRow(device: DeviceEvent, key: string, onClick: MouseEventHandler<HTMLAnchorElement>) {
   return (
     <li key={key}>
-      <Link to={"/device/" + device.id} className="nav-link" onClick={ onClick }  >
-        <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i> 
+      <Link to={"/device/" + device.id} className="nav-link" onClick={ onClick } >
+        <PowerIcon device={device} />
         {device.name}
       </Link>
     </li>
@@ -22,27 +23,25 @@ function MenuRow(device: DeviceEvent, key: string, onClick: MouseEventHandler<HT
 }
 
 export default function Menu({ devices }: MenuProperties) {
-
-    const [show, setShow] = useState(false);
+  const [show, setShow] = useState(false);
 
   const handleClose = () => setShow(false);
   const handleShow = () => setShow(true);
 
   return (
     <>
-    <Nav className="col-md-3 col-lg-2 d-none d-sm-none d-md-block sidebar">
-      <div className="sidebar-sticky">
-        <ul className="nav flex-column">
-          <li className="nav-item">
-            <Link to={"/"} className="nav-link">
-              <i className={"fa-solid fa-gauge"}></i> Dashboard 
-            </Link>
-          </li>
-          {Object.values(devices).map((device: DeviceEvent) => MenuRow(device, "menu-device-big-" + device.id, () => {}))}
-        </ul>
-      </div>
-    </Nav>
-
+      <Nav className="col-md-3 col-lg-2 d-none d-sm-none d-md-block sidebar">
+        <div className="sidebar-sticky">
+          <ul className="nav flex-column">
+            <li className="nav-item">
+              <Link to={"/"} className="nav-link">
+                <i className={"fa-solid fa-gauge"}></i> Dashboard 
+              </Link>
+            </li>
+            {Object.values(devices).map((device: DeviceEvent) => MenuRow(device, "menu-device-big-" + device.id, () => {}))}
+          </ul>
+        </div>
+      </Nav>
 
       <Button variant="secondary" onClick={handleShow} className="col-2 d-block d-md-none" style={{marginLeft: 15}} >
         <i className="fa fa-bars"></i>
@@ -67,6 +66,6 @@ export default function Menu({ devices }: MenuProperties) {
           </Nav>
         </Offcanvas.Body>
       </Offcanvas>
-      </>
+    </>
   );
 }

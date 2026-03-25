@@ -4,6 +4,7 @@ import SensorEvent from "./types/sensor";
 import { CredentialResponse } from '@react-oauth/google';
 import SensorDailyEvent from "./types/sensor-daily";
 import SensorEventStat from "./types/sensor-event-stat";
+import Config from "./types/config";
 
 export default class HttpApi {
 
@@ -102,13 +103,27 @@ export default class HttpApi {
         if (!response.ok) {
             throw new Error(`Response status: ${response.status}`);
         }
-        const parsed = response.json()
-        return parsed;
+        return response.json()
+    }
+
+    public async getConfig(deviceId: number): Promise<Config> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/control`,
+            {
+                headers: {
+                    'Authorization': 'Bearer ' + this.token,
+                }
+            }
+        );
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+        return response.json()
     }
 
     public async control(deviceId: number, parameter: string, value: string): Promise<void> {
         const response = await fetch(
-            import.meta.env.VITE_API_URL + '/api/device/control',
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/control`,
             {
                 method: 'POST',
                 headers: {

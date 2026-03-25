@@ -34,7 +34,7 @@ export function DashboardPage({ devices }: DashboardProperties) {
   return (
     <>
       <div className="row">
-        {devices.map((device: DeviceEvent) => DeviceBlock(device))}
+        {Object.values(devices).map((device: DeviceEvent) => DeviceBlock(device))}
       </div>
     </>
   );

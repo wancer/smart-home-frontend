@@ -2,23 +2,23 @@
 
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
-
-import {
-  Chart as ChartJS,
-  LineController,
-  LinearScale,
-  CategoryScale,
-  BarController,
-  BarElement,
-  PointElement,
-  LineElement,
-  Filler,
-  Legend,
-  Title,
-  Tooltip,
-} from "chart.js";
-
+import { Col } from "react-bootstrap";
 import { Bar } from "react-chartjs-2";
+import { 
+  Chart as ChartJS, 
+  LineController, 
+  LinearScale, 
+  CategoryScale, 
+  BarController, 
+  BarElement,
+  PointElement, 
+  LineElement, 
+  Filler, 
+  Legend, 
+  Title, 
+  Tooltip, 
+  InteractionMode,
+} from "chart.js";
 
 ChartJS.register(
   LineController,
@@ -38,42 +38,31 @@ import DeviceEvent from "../api/types/device.ts";
 import HttpApi from "../api/http.ts";
 import SensorDailyEvent from "../api/types/sensor-daily.ts";
 import SensorEventStat from "../api/types/sensor-event-stat.ts";
-import { Col } from "react-bootstrap";
 
-type DeviceProperties = {
+type DevicePageProperties = {
   api: HttpApi;
+  devices: DeviceEvent[];
 };
 
-export function DevicePage({ api }: DeviceProperties) {
+export function DevicePage({ api, devices }: DevicePageProperties) {
   const { idStr } = useParams();
   const deviceId = typeof idStr === "undefined" ? 0 : +idStr;
 
-  const [isLoading, setLoading] = useState(true); // Loading state
-  const [device, setDevice] = useState<DeviceEvent>(new DeviceEvent({ state: {} }));
+  let device = devices[deviceId];
+
   const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[]>([]);
+  const [events30day, setEvents30day] = useState<SensorEventStat[]>([]);
   const [events7day, setEvents7day] = useState<SensorEventStat[]>([]);
   const [events5min, setEvents5min] = useState<SensorEventStat[]>([]);
   const [events1min, setEvents1min] = useState<SensorEventStat[]>([]);
 
   useEffect(() => {
-    api.device(deviceId).then((device) => {
-      setDevice(device);
-      setLoading(false);
-    });
-
     api.sensorsDaily(deviceId).then(setEventsMonthly);
-    api.sensorsConfigurable(deviceId, (7 * 24) + "h", "1h").then(setEvents7day);
+    api.sensorsConfigurable(deviceId, (30 * 24) + "h",  24 + "h").then(setEvents30day);
+    api.sensorsConfigurable(deviceId, 7 * 24 + "h", "1h").then(setEvents7day);
     api.sensorsConfigurable(deviceId, "24h", "5m").then(setEvents5min);
     api.sensorsConfigurable(deviceId, "1h", "1m").then(setEvents1min);
   }, [deviceId]);
-
-  useEffect(() => {
-    
-  }, [device]);
-
-  if (isLoading) {
-    return <>Loading...</>;
-  }
 
   return (
     <>
@@ -99,37 +88,19 @@ export function DevicePage({ api }: DeviceProperties) {
       <div className="row">
         <div className="row">
           <h2>
-            <strong>Power 1h / 1m</strong>
+            <strong>1h / 1m</strong>
           </h2>
         </div>
-        <ChartPower events={events1min} />
+        <ChartAllInOne events={events1min} />
       </div>
 
       <div className="row">
         <div className="row">
           <h2>
-            <strong>Consumption 24h / 5min</strong>
+            <strong>24h / 5min</strong>
           </h2>
         </div>
-        <ChartConsumption events={events5min} />
-      </div>
-
-      <div className="row">
-        <div className="row">
-          <h2>
-            <strong>Power 24h / 5min</strong>
-          </h2>
-        </div>
-        <ChartPower events={events5min} />
-      </div>
-
-      <div className="row">
-        <div className="row">
-          <h2>
-            <strong>Electricity on/off 24h / 5min</strong>
-          </h2>
-        </div>
-        <ChartElectricityOnOff events={events5min} />
+        <ChartAllInOne events={events5min} />
       </div>
 
       <div className="row">
@@ -139,6 +110,15 @@ export function DevicePage({ api }: DeviceProperties) {
           </h2>
         </div>
         <ChartConsumption events={events7day} />
+      </div>
+
+      <div className="row">
+        <div className="row">
+          <h2>
+            <strong>Consumption W*h 30d / 1d !EXP!</strong>
+          </h2>
+        </div>
+        <ChartConsumption events={events30day} />
       </div>
 
       <div className="row">
@@ -162,13 +142,19 @@ function RealtimeTable({ device }: ChartRealtimeProperties) {
     <>
       <div className="row font-monospace">
         <Col xs={4}>
-        <h1><strong> {device.state.power} W </strong></h1>
+          <h1>
+            <strong> {device.state.power} W </strong>
+          </h1>
         </Col>
         <Col xs={4}>
-        <h1><strong> {device.state.current} A </strong></h1>
+          <h1>
+            <strong> {device.state.current} A </strong>
+          </h1>
         </Col>
         <Col xs={4}>
-        <h1><strong> {device.state.voltage} V </strong></h1>
+          <h1>
+            <strong> {device.state.voltage} V </strong>
+          </h1>
         </Col>
       </div>
     </>
@@ -176,7 +162,7 @@ function RealtimeTable({ device }: ChartRealtimeProperties) {
 }
 
 type DailyChartProperties = {
-  dailyEvents: SensorDailyEvent[],
+  dailyEvents: SensorDailyEvent[];
 };
 
 function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
@@ -202,30 +188,7 @@ function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
   return <Bar data={data} options={options} />;
 }
 
-function ChartElectricityOnOff({ events }: {events: SensorEventStat[]}) {
-  const data = {
-    labels: events.map((record) => record.time),
-    datasets: [
-      {
-        label: "On",
-        borderColor: "rgb(4, 123, 0)",
-        backgroundColor: "rgba(47, 255, 0, 0.5)",
-        fill: true,
-        data: events.map((record) => record.currentAvg === null ? 0 : 1),
-      },
-    ],
-  };
-  const options = {
-    responsive: true,
-    animation: {
-      duration: 0,
-    },
-  };
-
-  return <Bar data={data} options={options} />;
-}
-
-function ChartConsumption({ events }: {events: SensorEventStat[]}) {
+function ChartConsumption({ events }: { events: SensorEventStat[] }) {
   const data = {
     labels: events.map((record) => record.time),
     datasets: [
@@ -248,10 +211,17 @@ function ChartConsumption({ events }: {events: SensorEventStat[]}) {
   return <Bar data={data} options={options} />;
 }
 
-function ChartPower({ events }: {events: SensorEventStat[]}) {
+function ChartAllInOne({ events }: { events: SensorEventStat[] }) {
   const data = {
     labels: events.map((record) => record.time),
     datasets: [
+      {
+        label: "On",
+        borderColor: "rgb(4, 123, 0)",
+        backgroundColor: "rgba(47, 255, 0, 0.5)",
+        fill: true,
+        data: events.map((record) => (record.currentAvg === null ? 0 : 1)),
+      },
       {
         label: "W",
         borderColor: "rgb(123, 0, 0)",
@@ -259,12 +229,34 @@ function ChartPower({ events }: {events: SensorEventStat[]}) {
         fill: true,
         data: events.map((record) => record.powerAvg),
       },
+      {
+        label: "W*h",
+        borderColor: "rgb(53, 0, 123)",
+        backgroundColor: "rgba(157, 0, 255, 0.5)",
+        fill: true,
+        data: events.map((record) => record.powerConsumed),
+      },
+      {
+        label: "A",
+        borderColor: "rgb(0, 25, 123)",
+        backgroundColor: "rgba(0, 72, 255, 0.5)",
+        fill: true,
+        data: events.map((record) => record.currentAvg),
+      },
     ],
   };
   const options = {
     responsive: true,
     animation: {
       duration: 0,
+    },
+    plugins: {
+      tooltip: {
+        intersect: false,
+        includeInvisible: true,
+        mode: "index" as InteractionMode,
+      },
+
     },
   };
 

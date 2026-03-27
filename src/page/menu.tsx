@@ -38,7 +38,7 @@ export default function Menu({ devices }: MenuProperties) {
                 <i className={"fa-solid fa-gauge"}></i> Dashboard 
               </Link>
             </li>
-            {Object.values(devices).map((device: DeviceEvent) => MenuRow(device, "menu-device-big-" + device.id, () => {}))}
+            {Object.values(devices).map((device: DeviceEvent) => MenuRow(device, "menu-desktop-device-" + device.id, () => {}))}
           </ul>
         </div>
       </Nav>
@@ -60,7 +60,7 @@ export default function Menu({ devices }: MenuProperties) {
                     <i className={"fa-solid fa-gauge"}></i> Dashboard 
                   </Link>
                 </li>
-                {Object.values((device: DeviceEvent) => MenuRow(device, "menu-device-big-" + device.id, handleClose))}            
+                {Object.values(devices).map((device: DeviceEvent) => MenuRow(device, "menu-mobile-device-" + device.id, handleClose))}
               </ul>
             </div>
           </Nav>

@@ -58,6 +58,11 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
   const [events1min, setEvents1min] = useState<SensorEventStat[]>([]);
 
   useEffect(() => {
+    setEvents30day([]);
+    setEvents7day([]);
+    setEvents5min([]);
+    setEvents1min([]);
+
     api.sensorsDaily(deviceId).then(setEventsMonthly);
     api.sensorsConfigurable(deviceId, (30 * 24) + "h",  24 + "h").then(setEvents30day);
     api.sensorsConfigurable(deviceId, 7 * 24 + "h", "1h").then(setEvents7day);

@@ -33,13 +33,9 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
   const [ledPwmOff, setLedPwmOff] = useState<number>( -1 );
 
   const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
-
-  useEffect(
-    () => {
-      setVoltageState(device.state.voltage)
-      setPowerState(device.state.power)
-
-      api.getConfig(deviceId).then((config) => {
+  
+  const updateConfigState = () => {
+    api.getConfig(deviceId).then((config) => {
         setSensorsFreq(config.telePeriod);
         setLedPower(config.ledPower);
         setLedMode(config.ledState);
@@ -48,6 +44,13 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
         setLedPwmOn(config.ledPwmOn);
         setLedPwmOff(config.ledPwmOff);
       })
+  }
+
+  useEffect(
+    () => {
+      setVoltageState(device.state.voltage)
+      setPowerState(device.state.power)
+      updateConfigState();
     },
     [device]
   )
@@ -74,6 +77,30 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
     await api.control(device.id, "power", powerState.toString());
     await delay(1 * 1000); // waiting for WS event after BE logic
     setPowerState(device.state.power);
+    setInProgress(false);
+  };
+
+  const saveLedPwmMode = async () => {
+    setInProgress(true);
+    await api.control(device.id, "led-pwm-mode", ledPwmMode ? "ON" : "OFF");
+    await delay(1 * 1000); // waiting for WS event after BE logic
+    updateConfigState();
+    setInProgress(false);
+  };
+
+  const saveLedPwmOn = async () => {
+    setInProgress(true);
+    await api.control(device.id, "led-pwm-on", ledPwmOn.toString());
+    await delay(1 * 1000); // waiting for WS event after BE logic
+    updateConfigState();
+    setInProgress(false);
+  };
+
+  const saveLedPwmOff = async () => {
+    setInProgress(true);
+    await api.control(device.id, "led-pwm-off", ledPwmOff.toString());
+    await delay(1 * 1000); // waiting for WS event after BE logic
+    updateConfigState();
     setInProgress(false);
   };
 
@@ -119,7 +146,7 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
                 </Form.Select>
               </Col>
               <Col sm="2">
-                <Button variant="success" type="submit">Save</Button>
+                <Button variant="success" type="button">Save</Button>
               </Col>
             </Form.Group>
           </Form>
@@ -132,10 +159,15 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
               <Form.Control value={sensorsFreq} onChange={e => setSensorsFreq(+e.target.value)}/>
               </Col>
               <Col sm="2">
-                <Button variant="success" type="submit">Save</Button>
+                <Button variant="success" type="button">Save</Button>
               </Col>
             </Form.Group>
           </Form>
+
+
+          <h2>
+            LED
+          </h2>
 
           <Form>
             <Form.Group as={Row} className="mb-3" controlId="formLedOnOff">
@@ -144,7 +176,7 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
                 <Form.Check type="switch" label="switch" value={1} checked={ledPower} onChange={() => setLedPower(!ledPower) }/>
               </Col>
               <Col sm="2">
-                <Button variant="success" type="submit">Save</Button>
+                <Button variant="success" type="button">Save</Button>
               </Col>
             </Form.Group>
           </Form>
@@ -166,7 +198,7 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
                 </Form.Select>
               </Col>
               <Col sm="2">
-                <Button variant="success" type="submit">Save</Button>
+                <Button variant="success" type="button">Save</Button>
               </Col>
             </Form.Group>
           </Form>
@@ -179,7 +211,7 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
                 <Form.Check type="switch" label="switch" value={1} checked={ledPwmMode} onChange={() => setLedPwmMode(!ledPwmMode) }/>
               </Col>
               <Col sm="2">
-                <Button variant="success" type="submit">Save</Button>
+                <Button variant="success" type="button" onClick={saveLedPwmMode}>Save</Button>
               </Col>
             </Form.Group>
           </Form>
@@ -191,7 +223,7 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
                 <Form.Control type="range" value={ledPwmOn} onChange={e => setLedPwmOn(+e.target.value) } min={0} max={255} />
               </Col>
               <Col sm="2">
-                <Button variant="success" type="submit">Save</Button>
+                <Button variant="success" type="button" onClick={saveLedPwmOn}>Save</Button>
               </Col>
             </Form.Group>
           </Form>
@@ -203,7 +235,7 @@ export default function DeviceControlPage({ api, devices }: DeviceControlPagePro
                 <Form.Control type="range" value={ledPwmOff} onChange={e => setLedPwmOff(+e.target.value) } min={0} max={255} />
               </Col>
               <Col sm="2">
-                <Button variant="success" type="submit">Save</Button>
+                <Button variant="success" type="button" onClick={saveLedPwmOff}>Save</Button>
               </Col>
             </Form.Group>
           </Form>

@@ -1,17 +1,27 @@
 'use client';
 
-export default class SensorEvent {
+export class SensorEvent {
     public deviceId: number;
-    public deviceTime: number;
+    public time: number;
     public power: number;
     public current: number;
     public voltage: number;
 
     constructor(decoded: any) {
         this.deviceId = decoded.deviceId;
-        this.deviceTime = decoded.deviceTime;
+        this.time = decoded.deviceTime;
         this.power = decoded.power;
         this.current = decoded.current;
         this.voltage = decoded.voltage;
+    }
+}
+
+export class StateEvent {
+    public deviceId: number;
+    public on: boolean|null;
+
+    constructor(decoded: any) {
+        this.deviceId = decoded.deviceId;
+        this.on = decoded.on
     }
 }

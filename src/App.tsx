@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import SensorEvent from "./api/types/sensor.ts";
+import { SensorEvent, StateEvent } from "./api/types/ws-event.ts";
 import DeviceEvent from "./api/types/device.ts";
 import HttpApi from "./api/http.ts";
 import {DevicePage} from "./page/device-page.tsx"
@@ -36,19 +36,19 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
         device.state.current = exact.current;
         device.state.voltage = exact.voltage;
         device.state.power = exact.power;
-
-        // records.push(exact);
+        device.state.last = exact.time
 
         return;
       } 
       
       if (parsed.channel === 'state') {
         console.log('state', parsed)
-        const exact = new DeviceEvent(parsed.body);
-        const device = devices[exact.id];
-        device.state = exact.state;
+        const exact = new StateEvent(parsed.body);
+        const device = devices[exact.deviceId];
+        device.state.on = exact.on;
         return;
       } 
+
       console.warn("unkown type", parsed)
     }
   }, [lastMessage]);

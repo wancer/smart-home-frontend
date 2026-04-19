@@ -52,20 +52,14 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
   let device = devices[deviceId];
 
   const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[]>([]);
-  const [events30day, setEvents30day] = useState<SensorEventStat[]>([]);
-  const [events7day, setEvents7day] = useState<SensorEventStat[]>([]);
   const [events5min, setEvents5min] = useState<SensorEventStat[]>([]);
   const [events1min, setEvents1min] = useState<SensorEventStat[]>([]);
 
   useEffect(() => {
-    setEvents30day([]);
-    setEvents7day([]);
     setEvents5min([]);
     setEvents1min([]);
 
     api.sensorsDaily(deviceId).then(setEventsMonthly);
-    api.sensorsConfigurable(deviceId, (30 * 24) + "h",  24 + "h").then(setEvents30day);
-    api.sensorsConfigurable(deviceId, 7 * 24 + "h", "1h").then(setEvents7day);
     api.sensorsConfigurable(deviceId, "24h", "5m").then(setEvents5min);
     api.sensorsConfigurable(deviceId, "1h", "1m").then(setEvents1min);
   }, [deviceId]);
@@ -103,24 +97,6 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
           </h2>
         </div>
         <ChartAllInOne events={events5min} />
-      </div>
-
-      <div className="row">
-        <div className="row">
-          <h2>
-            <strong>Consumption W*h 7d / 1h</strong>
-          </h2>
-        </div>
-        <ChartConsumption events={events7day} />
-      </div>
-
-      <div className="row">
-        <div className="row">
-          <h2>
-            <strong>Consumption W*h 30d / 1d !EXP!</strong>
-          </h2>
-        </div>
-        <ChartConsumption events={events30day} />
       </div>
 
       <div className="row">
@@ -177,29 +153,6 @@ function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
         backgroundColor: "rgba(157, 0, 255, 0.5)",
         fill: true,
         data: dailyEvents.map((dailyEvent) => dailyEvent.power),
-      },
-    ],
-  };
-  const options = {
-    responsive: true,
-    animation: {
-      duration: 0,
-    },
-  };
-
-  return <Bar data={data} options={options} />;
-}
-
-function ChartConsumption({ events }: { events: SensorEventStat[] }) {
-  const data = {
-    labels: events.map((record) => record.time),
-    datasets: [
-      {
-        label: "W*h",
-        borderColor: "rgb(53, 0, 123)",
-        backgroundColor: "rgba(157, 0, 255, 0.5)",
-        fill: true,
-        data: events.map((record) => record.powerConsumed),
       },
     ],
   };

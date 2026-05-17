@@ -19,5 +19,19 @@ export default function PowerIcon({device}: {device: DeviceEvent}) {
         return <i className="fa fa-warning text-warning" title={"Last seen: " + lastSeen }></i>
     }
 
-    return <i className={"fa fa-plug " + (device.state.on ? "text-success" : "text-danger")}></i> 
+    const color = device.supportsToggle ? (device.state.on ? "text-success" : "text-danger") : 'text-success';
+
+    if (device.isEnergySensor()) {
+        return <i className={"fa fa-plug " + color}></i> 
+    }
+
+    if (device.isThSensor()) {
+        return <i className={"fa fa-temperature-low " + color}></i> 
+    }
+
+    if (device.isCo2Sensor()) {
+        return <i className={"fa fa-smog " + color}></i> 
+    }
+
+    return <i className={"fa fa-circle-question" + color}></i> 
 }

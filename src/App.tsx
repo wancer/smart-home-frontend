@@ -33,10 +33,16 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
         console.log('sensor', parsed)
         const exact = new SensorEvent(parsed.body);
         const device = devices[exact.deviceId];
+
         device.state.current = exact.current;
         device.state.voltage = exact.voltage;
         device.state.power = exact.power;
-        device.state.last = exact.time
+        device.state.last = exact.time;
+
+        device.state.co2 = exact.co2;
+        device.state.co2e = exact.co2e;
+        device.state.temperature = exact.temperature;
+        device.state.humidity = exact.humidity;
 
         return;
       } 
@@ -68,7 +74,6 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
       </Spinner>
     );
   }
-
 
   return <BrowserRouter>
         <Container fluid>

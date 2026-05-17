@@ -68,7 +68,12 @@ export default class HttpApi {
         if (!response.ok) {
             throw new Error(`Response status: ${response.status}`);
         }
-        const parsed = response.json()
+        const parsed = await response.json();
+
+        Object.keys(parsed).map(
+            (key) => { parsed[key] = new DeviceEvent(parsed[key])},
+        );
+
         return parsed;
     }
 

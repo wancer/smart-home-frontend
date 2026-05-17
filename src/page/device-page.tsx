@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router-dom";
 import { Col } from "react-bootstrap";
-import { Bar } from "react-chartjs-2";
+import { Bar, Line } from "react-chartjs-2";
 import { 
   Chart as ChartJS, 
   LineController, 
@@ -77,64 +77,156 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
         </h2>
       </div>
 
-      <div className="row">
-        <RealtimeTable device={device} />
-      </div>
+      { device.isEnergySensor() && (
+        <>
+          <div className="row">
+            <div className="row font-monospace">
+              <Col xs={4}>
+                <h1>
+                  <strong> {device.state.power} W </strong>
+                </h1>
+              </Col>
+              <Col xs={4}>
+                <h1>
+                  <strong> {device.state.current} A </strong>
+                </h1>
+              </Col>
+              <Col xs={4}>
+                <h1>
+                  <strong> {device.state.voltage} V </strong>
+                </h1>
+              </Col>
+            </div>
+          </div>
 
-      <div className="row">
-        <div className="row">
-          <h2>
-            <strong>1h / 1m</strong>
-          </h2>
-        </div>
-        <ChartAllInOne events={events1min} />
-      </div>
+          <div className="row">
+            <div className="row">
+              <h2>
+                <strong>1h / 1m</strong>
+              </h2>
+            </div>
+            <ChartAllInOne events={events1min} />
+          </div>
 
-      <div className="row">
-        <div className="row">
-          <h2>
-            <strong>24h / 5min</strong>
-          </h2>
-        </div>
-        <ChartAllInOne events={events5min} />
-      </div>
+          <div className="row">
+            <div className="row">
+              <h2>
+                <strong>24h / 5min</strong>
+              </h2>
+            </div>
+            <ChartAllInOne events={events5min} />
+          </div>
 
-      <div className="row">
-        <div className="row">
-          <h2>
-            <strong>Consumption W*h 30d / 1d</strong>
-          </h2>
-        </div>
-        <ChartDailyConsumption dailyEvents={eventsMonthly} />
-      </div>
-    </>
-  );
-}
+          <div className="row">
+            <div className="row">
+              <h2>
+                <strong>Consumption W*h 30d / 1d</strong>
+              </h2>
+            </div>
+            <ChartDailyConsumption dailyEvents={eventsMonthly} />
+          </div>
+        </>
+      ) }
 
-type ChartRealtimeProperties = {
-  device: DeviceEvent;
-};
 
-function RealtimeTable({ device }: ChartRealtimeProperties) {
-  return (
-    <>
-      <div className="row font-monospace">
-        <Col xs={4}>
-          <h1>
-            <strong> {device.state.power} W </strong>
-          </h1>
-        </Col>
-        <Col xs={4}>
-          <h1>
-            <strong> {device.state.current} A </strong>
-          </h1>
-        </Col>
-        <Col xs={4}>
-          <h1>
-            <strong> {device.state.voltage} V </strong>
-          </h1>
-        </Col>
-      </div>
+      { device.isCo2Sensor() && (
+        <>
+          <div className="row">
+            <div className="row font-monospace">
+              <Col xs={4}>
+                <h1>
+                  <strong> {device.state.temperature} °C </strong>
+                </h1>
+              </Col>
+              <Col xs={4}>
+                <h1>
+                  <strong> {device.state.humidity} % </strong>
+                </h1>
+              </Col>
+              <Col xs={4}>
+                <h1>
+                  <strong> {device.state.co2e} ppm </strong>
+                </h1>
+              </Col>
+            </div>
+          </div>
+
+
+          <div className="row">
+            <div className="row">
+              <h2>
+                <strong>1h / 1m</strong>
+              </h2>
+            </div>
+            <ChartCo2 events={events1min} />
+          </div>
+
+          <div className="row">
+            <div className="row">
+              <h2>
+                <strong>24h / 5min</strong>
+              </h2>
+            </div>
+            <ChartCo2 events={events5min} />
+          </div>
+
+
+          <div className="row">
+            <div className="row">
+              <h2>
+                <strong>1h / 1m</strong>
+              </h2>
+            </div>
+            <ChartTH events={events1min} />
+          </div>
+
+          <div className="row">
+            <div className="row">
+              <h2>
+                <strong>24h / 5min</strong>
+              </h2>
+            </div>
+            <ChartTH events={events5min} />
+          </div>
+        </>
+      ) }
+
+      { device.isThSensor() && (
+        <>
+          <div className="row">
+            <div className="row font-monospace">
+              <Col xs={4}>
+                <h1>
+                  <strong> {device.state.temperature} °C </strong>
+                </h1>
+              </Col>
+              <Col xs={4}>
+                <h1>
+                  <strong> {device.state.humidity} % </strong>
+                </h1>
+              </Col>
+            </div>
+          </div>
+
+          <div className="row">
+            <div className="row">
+              <h2>
+                <strong>1h / 1m</strong>
+              </h2>
+            </div>
+            <ChartTH events={events1min} />
+          </div>
+
+          <div className="row">
+            <div className="row">
+              <h2>
+                <strong>24h / 5min</strong>
+              </h2>
+            </div>
+            <ChartTH events={events5min} />
+          </div>
+        </>
+      ) }
     </>
   );
 }
@@ -216,6 +308,77 @@ function ChartAllInOne({ events }: { events: SensorEventStat[] }) {
   };
 
   return <Bar data={data} options={options} />;
+}
+
+function ChartCo2({ events }: { events: SensorEventStat[] }) {
+  const data = {
+    labels: events.map((record) => record.time),
+    datasets: [
+      {
+        label: "eCO₂ ppm",
+        borderColor: "rgb(4, 123, 0)",
+        backgroundColor: "rgba(47, 255, 0, 0.5)",
+        fill: true,
+        data: events.map((record) => record.co2eAvg),
+      },
+    ],
+  };
+  const options = {
+    responsive: true,
+    animation: {
+      duration: 0,
+    },
+    stacked: false,
+    plugins: {
+      tooltip: {
+        intersect: false,
+        includeInvisible: true,
+        mode: "index" as InteractionMode,
+      },
+    },
+  };
+
+  return <Line data={data} options={options} />;
+}
+
+
+
+function ChartTH({ events }: { events: SensorEventStat[] }) {
+  const data = {
+    labels: events.map((record) => record.time),
+    datasets: [
+      {
+        label: "°C",
+        borderColor: "rgb(123, 0, 0)",
+        backgroundColor: "rgba(255, 0, 0, 0.5)",
+        fill: true,
+        data: events.map((record) => record.temperatureAvg),
+      },
+      {
+        label: "H₂O %",
+        borderColor: "rgb(53, 0, 123)",
+        backgroundColor: "rgba(157, 0, 255, 0.5)",
+        fill: true,
+        data: events.map((record) => record.humidityAvg),
+      },
+    ],
+  };
+  const options = {
+    responsive: true,
+    animation: {
+      duration: 0,
+    },
+    stacked: false,
+    plugins: {
+      tooltip: {
+        intersect: false,
+        includeInvisible: true,
+        mode: "index" as InteractionMode,
+      },
+    },
+  };
+
+  return <Line data={data} options={options} />;
 }
 
 /*

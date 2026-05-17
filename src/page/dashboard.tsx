@@ -18,13 +18,32 @@ function DeviceBlock(device: DeviceEvent) {
       </div>
       <div className="row font-monospace" style={{textAlign: "right"}}>
         <div className="col-md-8">
-          <h1>
+          { device.isEnergySensor() && (<h1>
               <strong> {device.state.power} W </strong>
               <br/>
               <strong> {device.state.current} A </strong>
               <br/>
               <strong> {device.state.voltage} V </strong>
-          </h1>
+          </h1>) 
+          }
+
+          { device.isCo2Sensor() && (<h1>
+              <strong> {device.state.temperature} ° </strong>
+              <br/>
+              <strong> {device.state.humidity} % </strong>
+              <br/>
+              <strong> {device.state.co2e} * </strong>
+          </h1>) 
+          }
+
+          { device.isThSensor() && (<h1>
+              <strong> {device.state.temperature} ° </strong>
+              <br/>
+              <strong> {device.state.humidity} % </strong>
+              <br/>
+          </h1>) 
+          }
+          
         </div>
       </div>
     </div>

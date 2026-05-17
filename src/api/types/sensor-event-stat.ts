@@ -6,6 +6,9 @@ export default class SensorEventStat {
     public powerAvg: number;
     public currentAvg: number;
     public voltageAvg: number;
+    public co2eAvg: number;
+    public temperatureAvg: number;
+    public humidityAvg: number;
 
     constructor(decoded: any) {
         this.time = decoded.time;
@@ -13,5 +16,8 @@ export default class SensorEventStat {
         this.powerAvg = decoded.powerAvg;
         this.currentAvg = decoded.currentAvg;
         this.voltageAvg = decoded.voltageAvg;
+        this.co2eAvg = decoded.co2eAvg
+        this.temperatureAvg = decoded.temperatureAvg
+        this.humidityAvg = decoded.humidityAvg
     }
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import { Link } from "react-router-dom";
 import DeviceEvent from "../api/types/device";
 import PowerIcon from "../element/power-icon";
 
@@ -12,8 +13,10 @@ function DeviceBlock(device: DeviceEvent) {
     <div className="col-md-6 col-sm-6 col-xs-12" key={"dashboard-block-" + device.id}>
       <div className="row">
         <h2>
-          <PowerIcon device={device} />
-          <strong>{device.name}</strong>
+          <Link to={"/device/" + device.id} className="text-decoration-none text-reset">
+            <PowerIcon device={device} />
+            <strong>{device.name}</strong>
+          </Link>
         </h2>
       </div>
       <div className="row font-monospace" style={{textAlign: "right"}}>
@@ -54,7 +57,7 @@ export function DashboardPage({ devices }: DashboardProperties) {
   return (
     <>
       <div className="row">
-        {Object.values(devices).map((device: DeviceEvent) => DeviceBlock(device))}
+        {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) => DeviceBlock(device))}
       </div>
     </>
   );

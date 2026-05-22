@@ -11,7 +11,7 @@ import { Container, Row, Spinner } from 'react-bootstrap';
 
 import Menu from "./page/menu.tsx";
 import { DashboardPage } from "./page/dashboard.tsx";
-import DeviceControlPage from "./page/device-control-page.tsx";
+import DevicesAdminPage from "./page/devices-admin-page.tsx";
 
 type AuthorizedUserAppProperties = {
   api: HttpApi;
@@ -85,7 +85,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
                     <Routes>
                       <Route index path="/" element={<DashboardPage devices={devices}/>} />
                       <Route path="/device/:idStr" element={<DevicePage api={api} devices={devices} />}/>
-                      <Route path="/device/:idStr/control" element={<DeviceControlPage api={api} devices={devices} />}/>
+                      <Route path="/devices" element={<DevicesAdminPage api={api} devices={devices} onDevicesChange={setDevices} />}/>
                     </Routes>
                   </div>
                 </main>

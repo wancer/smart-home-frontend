@@ -93,6 +93,61 @@ export default class HttpApi {
         return parsed;
     }
 
+    public async createDevice(data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean }): Promise<DeviceEvent> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + '/api/devices',
+            {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.token,
+                },
+                body: JSON.stringify(data),
+            }
+        );
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+        const parsed = await response.json();
+        return new DeviceEvent(parsed);
+    }
+
+    public async updateDevice(deviceId: number, data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean }): Promise<DeviceEvent> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.token,
+                },
+                body: JSON.stringify(data),
+            }
+        );
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+        const parsed = await response.json();
+        return new DeviceEvent(parsed);
+    }
+
+    public async deleteDevice(deviceId: number): Promise<void> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}`,
+            {
+                method: 'DELETE',
+                headers: {
+                    'Authorization': 'Bearer ' + this.token,
+                },
+            }
+        );
+        if (!response.ok) {
+            throw new Error(`Response status: ${response.status}`);
+        }
+    }
+
     public async login(google: CredentialResponse): Promise<Login> {
         const response = await fetch(
             import.meta.env.VITE_API_URL + '/api/auth/login',

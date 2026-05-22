@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router-dom";
+import { useParams } from "react-router-dom";
 import { Col } from "react-bootstrap";
+import DeviceConfigPanel from "../element/device-config-panel.tsx";
 import { Bar, Line } from "react-chartjs-2";
 import { 
   Chart as ChartJS, 
@@ -54,7 +55,6 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
   const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[]>([]);
   const [events5min, setEvents5min] = useState<SensorEventStat[]>([]);
   const [events1min, setEvents1min] = useState<SensorEventStat[]>([]);
-
   useEffect(() => {
     setEvents5min([]);
     setEvents1min([]);
@@ -67,13 +67,10 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
   return (
     <>
       <div className="row">
-        <h2>
+        <h2 className="d-flex align-items-center gap-2">
           <PowerIcon device={device}/>
           {device.name}
-
-          <Link to={"/device/" + device.id + "/control"} className="">
-            <i className={"fa fa-cog text-primary"}></i>
-          </Link>
+          <DeviceConfigPanel api={api} device={device} />
         </h2>
       </div>
 

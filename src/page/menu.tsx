@@ -35,10 +35,17 @@ export default function Menu({ devices }: MenuProperties) {
           <ul className="nav flex-column">
             <li className="nav-item">
               <Link to={"/"} className="nav-link">
-                <i className={"fa-solid fa-gauge"}></i> Dashboard 
+                <i className={"fa-solid fa-gauge"}></i> Dashboard
               </Link>
             </li>
-            {Object.values(devices).map((device: DeviceEvent) => MenuRow(device, "menu-desktop-device-" + device.id, () => {}))}
+            {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) => MenuRow(device, "menu-desktop-device-" + device.id, () => {}))}
+          </ul>
+          <ul className="nav flex-column mt-auto" style={{borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 8}}>
+            <li className="nav-item">
+              <Link to={"/devices"} className="nav-link">
+                <i className={"fa-solid fa-gear"}></i> Devices
+              </Link>
+            </li>
           </ul>
         </div>
       </Nav>
@@ -48,19 +55,24 @@ export default function Menu({ devices }: MenuProperties) {
       </Button>
 
       <Offcanvas show={show} onHide={handleClose}>
-        <Offcanvas.Header closeButton>
-          <Offcanvas.Title>Offcanvas</Offcanvas.Title>
-        </Offcanvas.Header>
+        <Offcanvas.Header closeButton />
         <Offcanvas.Body>
           <Nav className="">
             <div className="sidebar-sticky">
               <ul className="nav flex-column">
                 <li className="nav-item">
                   <Link to={"/"} className="nav-link" onClick={handleClose}>
-                    <i className={"fa-solid fa-gauge"}></i> Dashboard 
+                    <i className={"fa-solid fa-gauge"}></i> Dashboard
                   </Link>
                 </li>
-                {Object.values(devices).map((device: DeviceEvent) => MenuRow(device, "menu-mobile-device-" + device.id, handleClose))}
+                {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) => MenuRow(device, "menu-mobile-device-" + device.id, handleClose))}
+              </ul>
+              <ul className="nav flex-column" style={{borderTop: "1px solid rgba(0,0,0,0.1)", paddingTop: 8, marginTop: 8}}>
+                <li className="nav-item">
+                  <Link to={"/devices"} className="nav-link" onClick={handleClose}>
+                    <i className={"fa-solid fa-gear"}></i> Devices
+                  </Link>
+                </li>
               </ul>
             </div>
           </Nav>

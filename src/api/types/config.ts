@@ -31,11 +31,13 @@ export default class Config {
     public timezone: string;
     public firmware: FirmwareConfig;
     public led: LedConfig;
+    public hardware: string | null;
 
     constructor(decoded: any) {
         this.telePeriod = decoded.telePeriod;
         this.timezone = decoded.timezone;
         this.firmware = new FirmwareConfig(decoded.firmware);
         this.led = new LedConfig(decoded.led);
+        this.hardware = decoded.hardware ?? null;
     }
 }

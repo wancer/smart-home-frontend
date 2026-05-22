@@ -31,13 +31,17 @@ class DeviceState {
 export default class DeviceEvent {
     public id: number;
     public name: string;
+    public topic: string;
+    public enabled: boolean;
     public state: DeviceState;
     public sensorType: string;
     public supportsToggle: boolean;
-    
+
     constructor(decoded: any) {
         this.id = decoded.id;
         this.name = decoded.name;
+        this.topic = decoded.topic ?? '';
+        this.enabled = decoded.enabled ?? true;
         this.state = new DeviceState(decoded.state)
         this.sensorType = decoded.sensorType;
         this.supportsToggle = decoded.supportsToggle;

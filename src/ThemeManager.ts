@@ -14,6 +14,10 @@ class ThemeManager {
         this.switch(this.theme);
     }
 
+    public getTheme(): Theme {
+        return this.theme;
+    }
+
     public toggle(): void {
         let newTheme: Theme;
         if (this.theme === Theme.Dark) {

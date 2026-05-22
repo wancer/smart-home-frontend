@@ -8,6 +8,7 @@ import { GoogleOAuthProvider, GoogleLogin } from '@react-oauth/google';
 
 import HttpApi from "./api/http.ts";
 import { themeManager } from './ThemeManager.ts'
+import "./i18n/index.ts";
 import { AuthorizedUserApp } from "./App.tsx"
 
 const localStorageField = "jwt";

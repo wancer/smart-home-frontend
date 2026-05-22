@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { SensorEvent, StateEvent } from "./api/types/ws-event.ts";
 import DeviceEvent from "./api/types/device.ts";
 import HttpApi from "./api/http.ts";
@@ -18,6 +19,7 @@ type AuthorizedUserAppProperties = {
 };
 
 export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
+  const { t } = useTranslation();
   const [devices, setDevices] = useState<DeviceEvent[]>([]);
   const [isLoading, setLoading] = useState(true); // Loading state
   const [socketUrl] = useState(import.meta.env.VITE_API_URL +'/api/ws?jwt=' + api.token);
@@ -70,7 +72,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
   if (isLoading) {
     return (
       <Spinner animation="border" role="status">
-        <span className="visually-hidden">Loading...</span>
+        <span className="visually-hidden">{t('app.loading')}</span>
       </Spinner>
     );
   }

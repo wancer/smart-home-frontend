@@ -1,0 +1,78 @@
+{
+  "menu": {
+    "dashboard": "Панель",
+    "devices": "Пристрої"
+  },
+  "dashboard": {
+    "updated": "оновлено"
+  },
+  "devicePage": {
+    "chart_1h_1m": "1год / 1хв",
+    "chart_24h_5min": "24год / 5хв",
+    "consumption_30d": "Споживання Вт·год — 30д / 1д",
+    "eco2_1h": "eCO₂ — 1год / 1хв",
+    "eco2_24h": "eCO₂ — 24год / 5хв",
+    "th_1h": "Температура та вологість — 1год / 1хв",
+    "th_24h": "Температура та вологість — 24год / 5хв"
+  },
+  "devicesAdmin": {
+    "title": "Пристрої",
+    "addDevice": "Додати пристрій",
+    "editDevice": "Редагувати пристрій",
+    "col_id": "ID",
+    "col_name": "Назва",
+    "col_topic": "MQTT тема",
+    "col_sensorType": "Тип сенсора",
+    "col_toggle": "Перемикач",
+    "col_enabled": "Увімкнено",
+    "yes": "Так",
+    "no": "Ні",
+    "cancel": "Скасувати",
+    "save": "Зберегти",
+    "saving": "Збереження…",
+    "noDevices": "Пристрої не налаштовані.",
+    "nameTopicRequired": "Назва та тема є обов'язковими.",
+    "deleteConfirm": "Видалити пристрій \"{{name}}\"?",
+    "form_name": "Назва",
+    "form_topic": "MQTT тема",
+    "form_topicHelp": "Тема пристрою Tasmota (напр. plug-living-room підписується на tele/plug-living-room/SENSOR). Зміни набудуть чинності після перезапуску сервісу.",
+    "form_sensorType": "Тип сенсора",
+    "form_sensorEnergy": "Енергія (потужність/струм/напруга)",
+    "form_sensorCo2": "CO₂ + Температура/Вологість",
+    "form_sensorTH": "Температура/Вологість",
+    "form_supportsToggle": "Підтримує перемикання живлення",
+    "form_enabled": "Увімкнено"
+  },
+  "configPanel": {
+    "section_power": "Живлення",
+    "section_general": "Загальне",
+    "section_led": "LED",
+    "section_calibration": "Калібрування",
+    "section_hardware": "Обладнання",
+    "on": "Вкл:",
+    "timezone": "Часовий пояс",
+    "sensorsFreq": "Частота сенсорів",
+    "ledOnOff": "LED вкл/викл",
+    "ledMode": "Режим LED",
+    "ledMode_0": "вимкнути використання LED по можливості",
+    "ledMode_1": "показувати стан живлення (LED увімкнено при увімкненні) (за замовчуванням)",
+    "ledMode_2": "мигати при підписках MQTT",
+    "ledMode_3": "стан живлення та мигання при підписках MQTT",
+    "ledMode_4": "мигати при публікаціях MQTT",
+    "ledMode_5": "стан живлення та мигання при публікаціях MQTT",
+    "ledMode_6": "мигати при всіх повідомленнях MQTT",
+    "ledMode_7": "стан живлення та мигання при повідомленнях MQTT",
+    "ledMode_8": "LED увімкнено при підключенні до Wi-Fi та MQTT.",
+    "pwmLedOnOff": "PWM LED вкл/викл",
+    "pwmIntensOn": "PWM інтенс. ON",
+    "pwmIntensOff": "PWM інтенс. OFF",
+    "voltage": "Напруга",
+    "power": "Потужність",
+    "chip": "Чіп",
+    "version": "Версія",
+    "buildAt": "Зібрано"
+  },
+  "app": {
+    "loading": "Завантаження..."
+  }
+}

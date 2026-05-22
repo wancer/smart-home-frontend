@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Button, Table, Modal, Form, Badge } from "react-bootstrap";
+import { useTranslation } from "react-i18next";
 import DeviceEvent from "../api/types/device";
 import HttpApi from "../api/http";
 
@@ -28,6 +29,7 @@ const emptyForm: DeviceFormData = {
 };
 
 export default function DevicesAdminPage({ api, devices, onDevicesChange }: DevicesAdminPageProperties) {
+  const { t } = useTranslation();
   const [showModal, setShowModal] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
   const [form, setForm] = useState<DeviceFormData>(emptyForm);
@@ -56,7 +58,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
 
   const handleSave = async () => {
     if (!form.name.trim() || !form.topic.trim()) {
-      setError("Name and topic are required.");
+      setError(t('devicesAdmin.nameTopicRequired'));
       return;
     }
     setSaving(true);
@@ -86,7 +88,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
   };
 
   const handleDelete = async (device: DeviceEvent) => {
-    if (!confirm(`Delete device "${device.name}"?`)) return;
+    if (!confirm(t('devicesAdmin.deleteConfirm', { name: device.name }))) return;
     try {
       await api.deleteDevice(device.id);
       const updated = { ...devices } as DeviceEvent[];
@@ -102,21 +104,21 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
   return (
     <>
       <div className="d-flex justify-content-between align-items-center mb-3">
-        <h2><i className="fa-solid fa-gear me-2"></i>Devices</h2>
+        <h2><i className="fa-solid fa-gear me-2"></i>{t('devicesAdmin.title')}</h2>
         <Button variant="primary" onClick={openCreate}>
-          <i className="fa-solid fa-plus me-1"></i> Add Device
+          <i className="fa-solid fa-plus me-1"></i> {t('devicesAdmin.addDevice')}
         </Button>
       </div>
 
       <Table striped bordered hover responsive>
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Name</th>
-            <th>MQTT Topic</th>
-            <th>Sensor Type</th>
-            <th>Toggle</th>
-            <th>Enabled</th>
+            <th>{t('devicesAdmin.col_id')}</th>
+            <th>{t('devicesAdmin.col_name')}</th>
+            <th>{t('devicesAdmin.col_topic')}</th>
+            <th>{t('devicesAdmin.col_sensorType')}</th>
+            <th>{t('devicesAdmin.col_toggle')}</th>
+            <th>{t('devicesAdmin.col_enabled')}</th>
             <th></th>
           </tr>
         </thead>
@@ -127,8 +129,8 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
               <td>{device.name}</td>
               <td><code>{device.topic}</code></td>
               <td>{device.sensorType}</td>
-              <td>{device.supportsToggle ? <Badge bg="success">Yes</Badge> : <Badge bg="secondary">No</Badge>}</td>
-              <td>{device.enabled ? <Badge bg="success">Yes</Badge> : <Badge bg="danger">No</Badge>}</td>
+              <td>{device.supportsToggle ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="secondary">{t('devicesAdmin.no')}</Badge>}</td>
+              <td>{device.enabled ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="danger">{t('devicesAdmin.no')}</Badge>}</td>
               <td>
                 <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => openEdit(device)}>
                   <i className="fa-solid fa-pen"></i>
@@ -141,7 +143,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
           ))}
           {deviceList.length === 0 && (
             <tr>
-              <td colSpan={7} className="text-center text-muted">No devices configured.</td>
+              <td colSpan={7} className="text-center text-muted">{t('devicesAdmin.noDevices')}</td>
             </tr>
           )}
         </tbody>
@@ -149,13 +151,13 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
 
       <Modal show={showModal} onHide={() => setShowModal(false)}>
         <Modal.Header closeButton>
-          <Modal.Title>{editingId === null ? "Add Device" : "Edit Device"}</Modal.Title>
+          <Modal.Title>{editingId === null ? t('devicesAdmin.addDevice') : t('devicesAdmin.editDevice')}</Modal.Title>
         </Modal.Header>
         <Modal.Body>
           {error && <div className="alert alert-danger">{error}</div>}
           <Form>
             <Form.Group className="mb-3">
-              <Form.Label>Name</Form.Label>
+              <Form.Label>{t('devicesAdmin.form_name')}</Form.Label>
               <Form.Control
                 value={form.name}
                 onChange={(e) => setForm({ ...form, name: e.target.value })}
@@ -163,31 +165,31 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
               />
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>MQTT Topic</Form.Label>
+              <Form.Label>{t('devicesAdmin.form_topic')}</Form.Label>
               <Form.Control
                 value={form.topic}
                 onChange={(e) => setForm({ ...form, topic: e.target.value })}
                 placeholder="plug-living-room"
               />
               <Form.Text className="text-muted">
-                Tasmota device topic (e.g. <code>plug-living-room</code> subscribes to <code>tele/plug-living-room/SENSOR</code>). Changes take effect after service restart.
+                {t('devicesAdmin.form_topicHelp')}
               </Form.Text>
             </Form.Group>
             <Form.Group className="mb-3">
-              <Form.Label>Sensor Type</Form.Label>
+              <Form.Label>{t('devicesAdmin.form_sensorType')}</Form.Label>
               <Form.Select
                 value={form.sensorType}
                 onChange={(e) => setForm({ ...form, sensorType: e.target.value })}
               >
-                <option value="energy">Energy (power/current/voltage)</option>
-                <option value="co2">CO₂ + Temperature/Humidity</option>
-                <option value="t-h">Temperature/Humidity</option>
+                <option value="energy">{t('devicesAdmin.form_sensorEnergy')}</option>
+                <option value="co2">{t('devicesAdmin.form_sensorCo2')}</option>
+                <option value="t-h">{t('devicesAdmin.form_sensorTH')}</option>
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Check
                 type="switch"
-                label="Supports power toggle"
+                label={t('devicesAdmin.form_supportsToggle')}
                 checked={form.supportsToggle}
                 onChange={(e) => setForm({ ...form, supportsToggle: e.target.checked })}
               />
@@ -195,7 +197,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
             <Form.Group className="mb-3">
               <Form.Check
                 type="switch"
-                label="Enabled"
+                label={t('devicesAdmin.form_enabled')}
                 checked={form.enabled}
                 onChange={(e) => setForm({ ...form, enabled: e.target.checked })}
               />
@@ -203,9 +205,9 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
           </Form>
         </Modal.Body>
         <Modal.Footer>
-          <Button variant="secondary" onClick={() => setShowModal(false)}>Cancel</Button>
+          <Button variant="secondary" onClick={() => setShowModal(false)}>{t('devicesAdmin.cancel')}</Button>
           <Button variant="primary" onClick={handleSave} disabled={saving}>
-            {saving ? "Saving…" : "Save"}
+            {saving ? t('devicesAdmin.saving') : t('devicesAdmin.save')}
           </Button>
         </Modal.Footer>
       </Modal>

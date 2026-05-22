@@ -1,0 +1,78 @@
+{
+  "menu": {
+    "dashboard": "Dashboard",
+    "devices": "Devices"
+  },
+  "dashboard": {
+    "updated": "updated"
+  },
+  "devicePage": {
+    "chart_1h_1m": "1h / 1m",
+    "chart_24h_5min": "24h / 5min",
+    "consumption_30d": "Consumption W·h — 30d / 1d",
+    "eco2_1h": "eCO₂ — 1h / 1m",
+    "eco2_24h": "eCO₂ — 24h / 5min",
+    "th_1h": "Temperature & Humidity — 1h / 1m",
+    "th_24h": "Temperature & Humidity — 24h / 5min"
+  },
+  "devicesAdmin": {
+    "title": "Devices",
+    "addDevice": "Add Device",
+    "editDevice": "Edit Device",
+    "col_id": "ID",
+    "col_name": "Name",
+    "col_topic": "MQTT Topic",
+    "col_sensorType": "Sensor Type",
+    "col_toggle": "Toggle",
+    "col_enabled": "Enabled",
+    "yes": "Yes",
+    "no": "No",
+    "cancel": "Cancel",
+    "save": "Save",
+    "saving": "Saving…",
+    "noDevices": "No devices configured.",
+    "nameTopicRequired": "Name and topic are required.",
+    "deleteConfirm": "Delete device \"{{name}}\"?",
+    "form_name": "Name",
+    "form_topic": "MQTT Topic",
+    "form_topicHelp": "Tasmota device topic (e.g. plug-living-room subscribes to tele/plug-living-room/SENSOR). Changes take effect after service restart.",
+    "form_sensorType": "Sensor Type",
+    "form_sensorEnergy": "Energy (power/current/voltage)",
+    "form_sensorCo2": "CO₂ + Temperature/Humidity",
+    "form_sensorTH": "Temperature/Humidity",
+    "form_supportsToggle": "Supports power toggle",
+    "form_enabled": "Enabled"
+  },
+  "configPanel": {
+    "section_power": "Power",
+    "section_general": "General",
+    "section_led": "LED",
+    "section_calibration": "Calibration",
+    "section_hardware": "Hardware",
+    "on": "On:",
+    "timezone": "Timezone",
+    "sensorsFreq": "Sensors freq",
+    "ledOnOff": "LED on/off",
+    "ledMode": "LED mode",
+    "ledMode_0": "disable use of LED as much as possible",
+    "ledMode_1": "show power state on LED (LED on when power on) (default)",
+    "ledMode_2": "show MQTT subscriptions as a LED blink",
+    "ledMode_3": "show power state and MQTT subscriptions as a LED blink",
+    "ledMode_4": "show MQTT publications as a LED blink",
+    "ledMode_5": "show power state and MQTT publications as a LED blink",
+    "ledMode_6": "show all MQTT messages as a LED blink",
+    "ledMode_7": "show power state and MQTT messages as a LED blink",
+    "ledMode_8": "LED on when Wi-Fi and MQTT are connected.",
+    "pwmLedOnOff": "PWM LED on/off",
+    "pwmIntensOn": "PWM intens ON",
+    "pwmIntensOff": "PWM intens OFF",
+    "voltage": "Voltage",
+    "power": "Power",
+    "chip": "Chip",
+    "version": "Version",
+    "buildAt": "Build At"
+  },
+  "app": {
+    "loading": "Loading..."
+  }
+}

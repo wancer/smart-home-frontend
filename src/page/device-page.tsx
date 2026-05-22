@@ -5,19 +5,19 @@ import { useParams } from "react-router-dom";
 import { Col } from "react-bootstrap";
 import DeviceConfigPanel from "../element/device-config-panel.tsx";
 import { Bar, Line } from "react-chartjs-2";
-import { 
-  Chart as ChartJS, 
-  LineController, 
-  LinearScale, 
-  CategoryScale, 
-  BarController, 
+import {
+  Chart as ChartJS,
+  LineController,
+  LinearScale,
+  CategoryScale,
+  BarController,
   BarElement,
-  PointElement, 
-  LineElement, 
-  Filler, 
-  Legend, 
-  Title, 
-  Tooltip, 
+  PointElement,
+  LineElement,
+  Filler,
+  Legend,
+  Title,
+  Tooltip,
   InteractionMode,
 } from "chart.js";
 
@@ -46,8 +46,38 @@ type DevicePageProperties = {
   devices: DeviceEvent[];
 };
 
+const xAxisConfig = {
+  ticks: {
+    maxTicksLimit: 12,
+    maxRotation: 0,
+  },
+};
+
+function fmtTime(unix: number): string {
+  return new Date(unix * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
+}
+
+type Period = "1h" | "24h" | "30d";
+type Co2Chart = "co2" | "th";
+
+function ButtonSelector<T extends string>({ options, labels, current, onChange }: { options: T[]; labels?: string[]; current: T; onChange: (v: T) => void }) {
+  return (
+    <div className="btn-group mb-3">
+      {options.map((o, i) => (
+        <button
+          key={o}
+          className={`btn btn-sm ${current === o ? "btn-primary" : "btn-outline-primary"}`}
+          onClick={() => onChange(o)}
+        >
+          {labels?.[i] ?? o}
+        </button>
+      ))}
+    </div>
+  );
+}
+
 export function DevicePage({ api, devices }: DevicePageProperties) {
-  const { idStr } = useParams();
+const { idStr } = useParams();
   const deviceId = typeof idStr === "undefined" ? 0 : +idStr;
 
   let device = devices[deviceId];
@@ -55,9 +85,14 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
   const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[]>([]);
   const [events5min, setEvents5min] = useState<SensorEventStat[]>([]);
   const [events1min, setEvents1min] = useState<SensorEventStat[]>([]);
+  const [period, setPeriod] = useState<Period>("1h");
+  const [co2Chart, setCo2Chart] = useState<Co2Chart>("co2");
+
   useEffect(() => {
     setEvents5min([]);
     setEvents1min([]);
+    setPeriod("1h");
+    setCo2Chart("co2");
 
     api.sensorsDaily(deviceId).then(setEventsMonthly);
     api.sensorsConfigurable(deviceId, "24h", "5m").then(setEvents5min);
@@ -97,34 +132,15 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
           </div>
 
           <div className="row">
-            <div className="row">
-              <h2>
-                <strong>1h / 1m</strong>
-              </h2>
+            <div className="d-flex gap-2">
+              <ButtonSelector options={["1h", "24h", "30d"]} current={period} onChange={setPeriod} />
             </div>
-            <ChartAllInOne events={events1min} />
-          </div>
-
-          <div className="row">
-            <div className="row">
-              <h2>
-                <strong>24h / 5min</strong>
-              </h2>
-            </div>
-            <ChartAllInOne events={events5min} />
-          </div>
-
-          <div className="row">
-            <div className="row">
-              <h2>
-                <strong>Consumption W*h 30d / 1d</strong>
-              </h2>
-            </div>
-            <ChartDailyConsumption dailyEvents={eventsMonthly} />
+            {period === "1h" && <ChartPower events={events1min} />}
+            {period === "24h" && <ChartPower events={events5min} />}
+            {period === "30d" && <ChartDailyConsumption dailyEvents={eventsMonthly} />}
           </div>
         </>
       ) }
-
 
       { device.isCo2Sensor() && (
         <>
@@ -148,42 +164,15 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
             </div>
           </div>
 
-
           <div className="row">
-            <div className="row">
-              <h2>
-                <strong>1h / 1m</strong>
-              </h2>
+            <div className="d-flex gap-2">
+              <ButtonSelector options={["1h", "24h"]} current={period} onChange={setPeriod} />
+              <ButtonSelector options={["co2", "th"]} labels={["CO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />
             </div>
-            <ChartCo2 events={events1min} />
-          </div>
-
-          <div className="row">
-            <div className="row">
-              <h2>
-                <strong>24h / 5min</strong>
-              </h2>
-            </div>
-            <ChartCo2 events={events5min} />
-          </div>
-
-
-          <div className="row">
-            <div className="row">
-              <h2>
-                <strong>1h / 1m</strong>
-              </h2>
-            </div>
-            <ChartTH events={events1min} />
-          </div>
-
-          <div className="row">
-            <div className="row">
-              <h2>
-                <strong>24h / 5min</strong>
-              </h2>
-            </div>
-            <ChartTH events={events5min} />
+            {period === "1h" && co2Chart === "co2" && <ChartCo2 events={events1min} />}
+            {period === "1h" && co2Chart === "th"  && <ChartTH  events={events1min} />}
+            {period === "24h" && co2Chart === "co2" && <ChartCo2 events={events5min} />}
+            {period === "24h" && co2Chart === "th"  && <ChartTH  events={events5min} />}
           </div>
         </>
       ) }
@@ -206,21 +195,11 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
           </div>
 
           <div className="row">
-            <div className="row">
-              <h2>
-                <strong>1h / 1m</strong>
-              </h2>
+            <div className="d-flex gap-2">
+              <ButtonSelector options={["1h", "24h"]} current={period} onChange={setPeriod} />
             </div>
-            <ChartTH events={events1min} />
-          </div>
-
-          <div className="row">
-            <div className="row">
-              <h2>
-                <strong>24h / 5min</strong>
-              </h2>
-            </div>
-            <ChartTH events={events5min} />
+            {period === "1h" && <ChartTH events={events1min} />}
+            {period === "24h" && <ChartTH events={events5min} />}
           </div>
         </>
       ) }
@@ -234,73 +213,95 @@ type DailyChartProperties = {
 
 function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
   const data = {
-    labels: dailyEvents.map((dailyEvent) => dailyEvent.date),
+    labels: dailyEvents.map((e) => e.date),
     datasets: [
       {
-        label: "W*h",
-        borderColor: "rgb(53, 0, 123)",
-        backgroundColor: "rgba(157, 0, 255, 0.5)",
-        fill: true,
-        data: dailyEvents.map((dailyEvent) => dailyEvent.power),
+        label: "W·h",
+        borderColor: "#7c3aed",
+        backgroundColor: "rgba(124,58,237,0.7)",
+        data: dailyEvents.map((e) => e.power),
       },
     ],
   };
   const options = {
     responsive: true,
-    animation: {
-      duration: 0,
+    animation: { duration: 0 },
+    plugins: {
+      tooltip: { mode: "index" as InteractionMode, intersect: false },
+    },
+    scales: {
+      x: xAxisConfig,
+      y: {
+        min: 0,
+        title: { display: true, text: "W·h" },
+      },
     },
   };
 
   return <Bar data={data} options={options} />;
 }
 
-function ChartAllInOne({ events }: { events: SensorEventStat[] }) {
+function ChartPower({ events }: { events: SensorEventStat[] }) {
   const data = {
-    labels: events.map((record) => record.time),
+    labels: events.map((r) => fmtTime(r.time)),
     datasets: [
       {
-        label: "On",
-        borderColor: "rgb(4, 123, 0)",
-        backgroundColor: "rgba(47, 255, 0, 0.5)",
-        fill: true,
-        data: events.map((record) => (record.currentAvg === null ? 0 : 1)),
-      },
-      {
         label: "W",
-        borderColor: "rgb(123, 0, 0)",
-        backgroundColor: "rgba(255, 0, 0, 0.5)",
+        borderColor: "#ef4444",
+        backgroundColor: "rgba(239,68,68,0.15)",
         fill: true,
-        data: events.map((record) => record.powerAvg),
-      },
-      {
-        label: "W*h",
-        borderColor: "rgb(53, 0, 123)",
-        backgroundColor: "rgba(157, 0, 255, 0.5)",
-        fill: true,
-        data: events.map((record) => record.powerConsumed),
-      },
-      {
-        label: "A",
-        borderColor: "rgb(0, 25, 123)",
-        backgroundColor: "rgba(0, 72, 255, 0.5)",
-        fill: true,
-        data: events.map((record) => record.currentAvg),
+        tension: 0.3,
+        pointRadius: 0,
+        yAxisID: "y",
+        data: events.map((r) => r.powerAvg),
       },
     ],
   };
   const options = {
     responsive: true,
-    animation: {
-      duration: 0,
-    },
+    animation: { duration: 0 },
+    interaction: { mode: "index" as InteractionMode, intersect: false },
     plugins: {
-      tooltip: {
-        intersect: false,
-        includeInvisible: true,
-        mode: "index" as InteractionMode,
+      tooltip: { mode: "index" as InteractionMode, intersect: false },
+    },
+    scales: {
+      x: xAxisConfig,
+      y: {
+        type: "linear" as const,
+        position: "left" as const,
+        min: 0,
+        title: { display: true, text: "W" },
       },
+    },
+  };
 
+  return <Line data={data} options={options} />;
+}
+
+function ChartConsumption({ events }: { events: SensorEventStat[] }) {
+  const data = {
+    labels: events.map((r) => fmtTime(r.time)),
+    datasets: [
+      {
+        label: "W·h",
+        borderColor: "#7c3aed",
+        backgroundColor: "rgba(124,58,237,0.65)",
+        data: events.map((r) => r.powerConsumed),
+      },
+    ],
+  };
+  const options = {
+    responsive: true,
+    animation: { duration: 0 },
+    plugins: {
+      tooltip: { mode: "index" as InteractionMode, intersect: false },
+    },
+    scales: {
+      x: xAxisConfig,
+      y: {
+        min: 0,
+        title: { display: true, text: "W·h" },
+      },
     },
   };
 
@@ -309,94 +310,87 @@ function ChartAllInOne({ events }: { events: SensorEventStat[] }) {
 
 function ChartCo2({ events }: { events: SensorEventStat[] }) {
   const data = {
-    labels: events.map((record) => record.time),
+    labels: events.map((r) => fmtTime(r.time)),
     datasets: [
       {
         label: "eCO₂ ppm",
-        borderColor: "rgb(4, 123, 0)",
-        backgroundColor: "rgba(47, 255, 0, 0.5)",
+        borderColor: "#10b981",
+        backgroundColor: "rgba(16,185,129,0.15)",
         fill: true,
-        data: events.map((record) => record.co2eAvg),
+        tension: 0.3,
+        pointRadius: 0,
+        data: events.map((r) => r.co2eAvg),
       },
     ],
   };
   const options = {
     responsive: true,
-    animation: {
-      duration: 0,
-    },
-    stacked: false,
+    animation: { duration: 0 },
     plugins: {
-      tooltip: {
-        intersect: false,
-        includeInvisible: true,
-        mode: "index" as InteractionMode,
+      tooltip: { mode: "index" as InteractionMode, intersect: false },
+    },
+    scales: {
+      x: xAxisConfig,
+      y: {
+        min: 400,
+        title: { display: true, text: "ppm" },
       },
     },
   };
 
   return <Line data={data} options={options} />;
 }
-
-
 
 function ChartTH({ events }: { events: SensorEventStat[] }) {
   const data = {
-    labels: events.map((record) => record.time),
+    labels: events.map((r) => fmtTime(r.time)),
     datasets: [
       {
         label: "°C",
-        borderColor: "rgb(123, 0, 0)",
-        backgroundColor: "rgba(255, 0, 0, 0.5)",
+        borderColor: "#f97316",
+        backgroundColor: "rgba(249,115,22,0.15)",
         fill: true,
-        data: events.map((record) => record.temperatureAvg),
+        tension: 0.3,
+        pointRadius: 0,
+        yAxisID: "y",
+        data: events.map((r) => r.temperatureAvg),
       },
       {
         label: "H₂O %",
-        borderColor: "rgb(53, 0, 123)",
-        backgroundColor: "rgba(157, 0, 255, 0.5)",
-        fill: true,
-        data: events.map((record) => record.humidityAvg),
+        borderColor: "#06b6d4",
+        backgroundColor: "rgba(6,182,212,0.1)",
+        fill: false,
+        tension: 0.3,
+        pointRadius: 0,
+        yAxisID: "y1",
+        data: events.map((r) => r.humidityAvg),
       },
     ],
   };
   const options = {
     responsive: true,
-    animation: {
-      duration: 0,
-    },
-    stacked: false,
+    animation: { duration: 0 },
+    interaction: { mode: "index" as InteractionMode, intersect: false },
     plugins: {
-      tooltip: {
-        intersect: false,
-        includeInvisible: true,
-        mode: "index" as InteractionMode,
+      tooltip: { mode: "index" as InteractionMode, intersect: false },
+    },
+    scales: {
+      x: xAxisConfig,
+      y: {
+        type: "linear" as const,
+        position: "left" as const,
+        title: { display: true, text: "°C" },
+      },
+      y1: {
+        type: "linear" as const,
+        position: "right" as const,
+        min: 0,
+        max: 100,
+        title: { display: true, text: "%" },
+        grid: { drawOnChartArea: false },
       },
     },
   };
 
   return <Line data={data} options={options} />;
 }
-
-/*
-
-
-function Footer() {
-  return <footer>
-          <ul className="list-inline">
-            <li>
-              <strong>Device name:</strong> device.name
-            </li>
-            <li>
-              <strong>Model:</strong> device.model
-            </li>
-            <li>
-              <strong>Sw ver:</strong> device.softwareVersion
-            </li>
-            <li>
-              <strong>Hw ver:</strong> device.hardwareVersion
-            </li>
-          </ul>
-        </footer> 
-}
-        */

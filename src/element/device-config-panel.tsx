@@ -1,5 +1,6 @@
 import { useState, useEffect } from "react";
 import { Row, Col, Button, ButtonGroup, Form, Modal } from "react-bootstrap";
+import { useTranslation } from "react-i18next";
 import HttpApi from "../api/http";
 import DeviceEvent from "../api/types/device";
 import timezones from '../page/timezones';
@@ -22,6 +23,7 @@ function SaveBtn({ disabled, onClick }: { disabled: boolean; onClick: () => void
 }
 
 export default function DeviceConfigPanel({ api, device }: Props) {
+  const { t } = useTranslation();
   const [inProgress, setInProgress] = useState(false);
   const [openSection, setOpenSection] = useState<Section>(null);
 
@@ -74,31 +76,31 @@ export default function DeviceConfigPanel({ api, device }: Props) {
     run(() => api.control(device.id, "on-off", device.state.on ? "OFF" : "ON"));
 
   const sectionTitles: Record<Exclude<Section, null>, string> = {
-    power: "Power",
-    general: "General",
-    led: "LED",
-    calibration: "Calibration",
-    hardware: "Hardware",
+    power: t('configPanel.section_power'),
+    general: t('configPanel.section_general'),
+    led: t('configPanel.section_led'),
+    calibration: t('configPanel.section_calibration'),
+    hardware: t('configPanel.section_hardware'),
   };
 
   return (
     <>
       <ButtonGroup size="sm">
         {device.supportsToggle && (
-          <Button variant="outline-secondary" title="Power" onClick={() => setOpenSection("power")}>
+          <Button variant="outline-secondary" title={t('configPanel.section_power')} onClick={() => setOpenSection("power")}>
             <i className="fa fa-power-off"></i>
           </Button>
         )}
-        <Button variant="outline-secondary" title="General" onClick={() => setOpenSection("general")}>
+        <Button variant="outline-secondary" title={t('configPanel.section_general')} onClick={() => setOpenSection("general")}>
           <i className="fa fa-clock"></i>
         </Button>
-        <Button variant="outline-secondary" title="LED" onClick={() => setOpenSection("led")}>
+        <Button variant="outline-secondary" title={t('configPanel.section_led')} onClick={() => setOpenSection("led")}>
           <i className="fa fa-lightbulb"></i>
         </Button>
-        <Button variant="outline-secondary" title="Calibration" onClick={() => setOpenSection("calibration")}>
+        <Button variant="outline-secondary" title={t('configPanel.section_calibration')} onClick={() => setOpenSection("calibration")}>
           <i className="fa fa-gauge"></i>
         </Button>
-        <Button variant="outline-secondary" title="Hardware" onClick={() => setOpenSection("hardware")}>
+        <Button variant="outline-secondary" title={t('configPanel.section_hardware')} onClick={() => setOpenSection("hardware")}>
           <i className="fa fa-microchip"></i>
         </Button>
       </ButtonGroup>
@@ -110,7 +112,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
         <Modal.Body>
           {openSection === "power" && (
             <Row className="align-items-center">
-              <Col xs="auto">On:</Col>
+              <Col xs="auto">{t('configPanel.on')}</Col>
               <Col xs="auto">
                 <button onClick={switchOnOff} disabled={inProgress} style={{ background: "none", border: "none", padding: 0, cursor: "pointer" }}>
                   <i
@@ -124,7 +126,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
           {openSection === "general" && (
             <>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgTimezone">
-                <Form.Label column sm="3">Timezone</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.timezone')}</Form.Label>
                 <Col sm="7">
                   <Form.Select value={timezone} onChange={e => setTimezone(e.target.value)}>
                     {timezones.map(tz => <option key={"tz-" + tz} value={tz}>{tz}</option>)}
@@ -135,7 +137,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                 </Col>
               </Form.Group>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgSensorsFreq">
-                <Form.Label column sm="3">Sensors freq</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.sensorsFreq')}</Form.Label>
                 <Col sm="7">
                   <Form.Control value={sensorsFreq} onChange={e => setSensorsFreq(+e.target.value)}/>
                 </Col>
@@ -148,7 +150,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
           {openSection === "led" && (
             <>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLedOnOff">
-                <Form.Label column sm="3">LED on/off</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.ledOnOff')}</Form.Label>
                 <Col sm="7">
                   <Form.Check type="switch" label="switch" value={1} checked={ledPower} onChange={() => setLedPower(!ledPower)}/>
                 </Col>
@@ -157,18 +159,12 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                 </Col>
               </Form.Group>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLedMode">
-                <Form.Label column sm="3">LED mode</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.ledMode')}</Form.Label>
                 <Col sm="7">
                   <Form.Select value={ledMode} onChange={e => setLedMode(+e.target.value)}>
-                    <option value={0}>disable use of LED as much as possible</option>
-                    <option value={1}>show power state on LED (LED on when power on) (default)</option>
-                    <option value={2}>show MQTT subscriptions as a LED blink</option>
-                    <option value={3}>show power state and MQTT subscriptions as a LED blink</option>
-                    <option value={4}>show MQTT publications as a LED blink</option>
-                    <option value={5}>show power state and MQTT publications as a LED blink</option>
-                    <option value={6}>show all MQTT messages as a LED blink</option>
-                    <option value={7}>show power state and MQTT messages as a LED blink</option>
-                    <option value={8}>LED on when Wi-Fi and MQTT are connected.</option>
+                    {([0,1,2,3,4,5,6,7,8] as const).map(n => (
+                      <option key={n} value={n}>{t(`configPanel.ledMode_${n}`)}</option>
+                    ))}
                   </Form.Select>
                 </Col>
                 <Col sm="2">
@@ -176,7 +172,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                 </Col>
               </Form.Group>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgPwmMode">
-                <Form.Label column sm="3">PWM LED on/off</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.pwmLedOnOff')}</Form.Label>
                 <Col sm="7">
                   <Form.Check type="switch" label="switch" value={1} checked={ledPwmMode} onChange={() => setLedPwmMode(!ledPwmMode)}/>
                 </Col>
@@ -185,7 +181,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                 </Col>
               </Form.Group>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLedPwmOn">
-                <Form.Label column sm="3">PWM intens ON</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.pwmIntensOn')}</Form.Label>
                 <Col sm="7">
                   <Form.Control type="range" value={ledPwmOn} onChange={e => setLedPwmOn(+e.target.value)} min={0} max={255}/>
                 </Col>
@@ -194,7 +190,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                 </Col>
               </Form.Group>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLedPwmOff">
-                <Form.Label column sm="3">PWM intens OFF</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.pwmIntensOff')}</Form.Label>
                 <Col sm="7">
                   <Form.Control type="range" value={ledPwmOff} onChange={e => setLedPwmOff(+e.target.value)} min={0} max={255}/>
                 </Col>
@@ -207,7 +203,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
           {openSection === "calibration" && (
             <>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgVoltage">
-                <Form.Label column sm="3">Voltage</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.voltage')}</Form.Label>
                 <Col sm="7">
                   <Form.Control type="number" value={voltageState} onChange={e => setVoltageState(+e.target.value)}/>
                 </Col>
@@ -216,7 +212,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                 </Col>
               </Form.Group>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgPower">
-                <Form.Label column sm="3">Power</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.power')}</Form.Label>
                 <Col sm="7">
                   <Form.Control type="number" value={powerState} onChange={e => setPowerState(+e.target.value)}/>
                 </Col>
@@ -230,18 +226,18 @@ export default function DeviceConfigPanel({ api, device }: Props) {
             <Form>
               {hardwareChip && (
                 <Form.Group as={Row} className="mb-3" controlId="cfgChip">
-                  <Form.Label column sm="3">Chip</Form.Label>
+                  <Form.Label column sm="3">{t('configPanel.chip')}</Form.Label>
                   <Col sm="9" className="d-flex align-items-center">
                     <i className="fa fa-microchip me-2 text-secondary"></i>{hardwareChip}
                   </Col>
                 </Form.Group>
               )}
               <Form.Group as={Row} className="mb-3" controlId="cfgFwVersion">
-                <Form.Label column sm="3">Version</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.version')}</Form.Label>
                 <Col sm="9" className="d-flex align-items-center">{firmwareVersion}</Col>
               </Form.Group>
               <Form.Group as={Row} className="mb-3" controlId="cfgFwBuiltAt">
-                <Form.Label column sm="3">Build At</Form.Label>
+                <Form.Label column sm="3">{t('configPanel.buildAt')}</Form.Label>
                 <Col sm="9" className="d-flex align-items-center">{firmwareBuiltAt}</Col>
               </Form.Group>
             </Form>

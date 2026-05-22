@@ -2,10 +2,12 @@
 
 import { Link } from "react-router-dom";
 import { MouseEventHandler, useState } from "react";
-import {Nav, Button, Offcanvas} from "react-bootstrap";
+import { Nav, Button, Offcanvas, ButtonGroup } from "react-bootstrap";
+import { useTranslation } from "react-i18next";
 
 import DeviceEvent from "../api/types/device";
 import PowerIcon from "../element/power-icon";
+import { themeManager, Theme } from "../ThemeManager";
 
 type MenuProperties = {
   devices: DeviceEvent[];
@@ -22,7 +24,46 @@ function MenuRow(device: DeviceEvent, key: string, onClick: MouseEventHandler<HT
   );
 }
 
+function ThemeToggle() {
+  const [theme, setTheme] = useState<Theme>(themeManager.getTheme());
+
+  const toggle = () => {
+    themeManager.toggle();
+    setTheme(themeManager.getTheme());
+  };
+
+  return (
+    <Button variant="outline-secondary" size="sm" onClick={toggle} style={{ margin: "8px 12px" }}>
+      <i className={theme === Theme.Dark ? "fa fa-sun" : "fa fa-moon"}></i>
+    </Button>
+  );
+}
+
+function LangSwitcher() {
+  const { i18n } = useTranslation();
+  const current = i18n.language;
+
+  const change = (lang: string) => {
+    i18n.changeLanguage(lang);
+    localStorage.setItem("lang", lang);
+  };
+
+  return (
+    <ButtonGroup size="sm" style={{ padding: "8px 12px" }}>
+      <Button
+        variant={current === "en" ? "secondary" : "outline-secondary"}
+        onClick={() => change("en")}
+      >EN</Button>
+      <Button
+        variant={current === "uk" ? "secondary" : "outline-secondary"}
+        onClick={() => change("uk")}
+      >UA</Button>
+    </ButtonGroup>
+  );
+}
+
 export default function Menu({ devices }: MenuProperties) {
+  const { t } = useTranslation();
   const [show, setShow] = useState(false);
 
   const handleClose = () => setShow(false);
@@ -35,7 +76,7 @@ export default function Menu({ devices }: MenuProperties) {
           <ul className="nav flex-column">
             <li className="nav-item">
               <Link to={"/"} className="nav-link">
-                <i className={"fa-solid fa-gauge"}></i> Dashboard
+                <i className={"fa-solid fa-gauge"}></i> {t('menu.dashboard')}
               </Link>
             </li>
             {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) => MenuRow(device, "menu-desktop-device-" + device.id, () => {}))}
@@ -43,8 +84,12 @@ export default function Menu({ devices }: MenuProperties) {
           <ul className="nav flex-column mt-auto" style={{borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 8}}>
             <li className="nav-item">
               <Link to={"/devices"} className="nav-link">
-                <i className={"fa-solid fa-gear"}></i> Devices
+                <i className={"fa-solid fa-gear"}></i> {t('menu.devices')}
               </Link>
+            </li>
+            <li className="nav-item d-flex align-items-center">
+              <LangSwitcher />
+              <ThemeToggle />
             </li>
           </ul>
         </div>
@@ -62,7 +107,7 @@ export default function Menu({ devices }: MenuProperties) {
               <ul className="nav flex-column">
                 <li className="nav-item">
                   <Link to={"/"} className="nav-link" onClick={handleClose}>
-                    <i className={"fa-solid fa-gauge"}></i> Dashboard
+                    <i className={"fa-solid fa-gauge"}></i> {t('menu.dashboard')}
                   </Link>
                 </li>
                 {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) => MenuRow(device, "menu-mobile-device-" + device.id, handleClose))}
@@ -70,8 +115,12 @@ export default function Menu({ devices }: MenuProperties) {
               <ul className="nav flex-column" style={{borderTop: "1px solid rgba(0,0,0,0.1)", paddingTop: 8, marginTop: 8}}>
                 <li className="nav-item">
                   <Link to={"/devices"} className="nav-link" onClick={handleClose}>
-                    <i className={"fa-solid fa-gear"}></i> Devices
+                    <i className={"fa-solid fa-gear"}></i> {t('menu.devices')}
                   </Link>
+                </li>
+                <li className="nav-item d-flex align-items-center">
+                  <LangSwitcher />
+                  <ThemeToggle />
                 </li>
               </ul>
             </div>

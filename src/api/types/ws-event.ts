@@ -15,7 +15,7 @@ export class SensorEvent {
 
     constructor(decoded: any) {
         this.deviceId = decoded.deviceId;
-        this.time = decoded.deviceTime;
+        this.time = decoded.time;
         
         this.power = decoded.power;
         this.current = decoded.current;

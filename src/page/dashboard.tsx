@@ -15,6 +15,7 @@ import {
   Filler,
 } from "chart.js";
 import DeviceEvent from "../api/types/device";
+import { CHART_COLORS } from "../chart-colors";
 import PowerIcon from "../element/power-icon";
 import HttpApi from "../api/http";
 import { DataPoint, HistoryMap } from "../App";
@@ -120,11 +121,11 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
   if (history === undefined) {
     sparkline = <SparklineSpinner />;
   } else if (device.isEnergySensor()) {
-    sparkline = <MiniSparkline points={history} borderColor="#ef4444" backgroundColor="rgba(239,68,68,0.15)" />;
+    sparkline = <MiniSparkline points={history} borderColor={CHART_COLORS.power.border} backgroundColor={CHART_COLORS.power.background} />;
   } else if (device.isCo2Sensor()) {
-    sparkline = <MiniSparkline points={history} borderColor="#10b981" backgroundColor="rgba(16,185,129,0.15)" />;
+    sparkline = <MiniSparkline points={history} borderColor={CHART_COLORS.co2.border} backgroundColor={CHART_COLORS.co2.background} />;
   } else if (device.isThSensor()) {
-    sparkline = <MiniSparkline points={history} borderColor="#f97316" backgroundColor="rgba(249,115,22,0.15)" />;
+    sparkline = <MiniSparkline points={history} borderColor={CHART_COLORS.temperature.border} backgroundColor={CHART_COLORS.temperature.background} />;
   }
 
   return (
@@ -180,7 +181,7 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
               <br />
               <strong> {device.state.humidity} % </strong>
               <br />
-              <strong> {device.state.co2e} * </strong>
+              <strong> {device.state.co2} ppm </strong>
             </h1>
           )}
           {device.isThSensor() && (

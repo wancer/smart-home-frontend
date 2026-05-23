@@ -54,7 +54,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
         device.state.humidity = exact.humidity;
 
         const value = device.isEnergySensor() ? exact.power
-                    : device.isCo2Sensor()    ? exact.co2e
+                    : device.isCo2Sensor()    ? exact.co2
                     : exact.temperature;
         const now = exact.time;
         setHistoryMap(prev => {
@@ -84,20 +84,21 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
       setDevices(devices);
       setLoading(false);
 
-      Object.values(devices)
-        .filter(d => d.enabled)
-        .forEach(async (device) => {
-          const records = await api.sensors(device.id);
-          const points: DataPoint[] = records
-            .flatMap(s => {
-              const value = device.isEnergySensor() ? s.power
-                          : device.isCo2Sensor()    ? s.co2e
-                          : s.temperature;
-              return value != null ? [{ time: s.time, value }] : [];
-            })
-            .sort((a, b) => a.time - b.time);
-          setHistoryMap(prev => ({ ...prev, [device.id]: points }));
-        });
+      const enabledDevices = Object.values(devices).filter(d => d.enabled);
+      const allRecords = await api.sensorsMulti(enabledDevices.map(d => d.id));
+      const newHistoryMap: HistoryMap = {};
+      for (const device of enabledDevices) {
+        const records = allRecords[device.id] ?? [];
+        newHistoryMap[device.id] = records
+          .flatMap(s => {
+            const value = device.isEnergySensor() ? s.power
+                        : device.isCo2Sensor()    ? s.co2
+                        : s.temperature;
+            return value != null ? [{ time: s.time, value }] : [];
+          })
+          .sort((a, b) => a.time - b.time);
+      }
+      setHistoryMap(prev => ({ ...prev, ...newHistoryMap }));
     });
   }, []);
 

@@ -37,6 +37,7 @@ ChartJS.register(
 );
 
 import DeviceEvent from "../api/types/device.ts";
+import { CHART_COLORS } from "../chart-colors.ts";
 import HttpApi from "../api/http.ts";
 import SensorDailyEvent from "../api/types/sensor-daily.ts";
 import SensorEventStat from "../api/types/sensor-event-stat.ts";
@@ -59,7 +60,7 @@ function fmtTime(unix: number): string {
 }
 
 type Period = "1h" | "24h" | "30d";
-type Co2Chart = "co2" | "th";
+type Co2Chart = "co2" | "eco2" | "th";
 type ChartMode = "sensor" | "online";
 
 function ButtonSelector<T extends string>({ options, labels, current, onChange }: { options: T[]; labels?: string[]; current: T; onChange: (v: T) => void }) {
@@ -185,13 +186,15 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
           <div className="row">
             <div className="d-flex gap-2">
               <ButtonSelector options={["1h", "24h"]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
-              {chartMode === "sensor" && <ButtonSelector options={["co2", "th"]} labels={["CO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />}
+              {chartMode === "sensor" && <ButtonSelector options={["co2", "eco2", "th"]} labels={["CO₂", "eCO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />}
               <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
             </div>
-            {period === "1h"  && chartMode === "sensor" && co2Chart === "co2" && (events1min === undefined ? <ChartSpinner /> : <ChartCo2 events={events1min} />)}
-            {period === "1h"  && chartMode === "sensor" && co2Chart === "th"  && (events1min === undefined ? <ChartSpinner /> : <ChartTH  events={events1min} />)}
-            {period === "24h" && chartMode === "sensor" && co2Chart === "co2" && (events5min === undefined ? <ChartSpinner /> : <ChartCo2 events={events5min} />)}
-            {period === "24h" && chartMode === "sensor" && co2Chart === "th"  && (events5min === undefined ? <ChartSpinner /> : <ChartTH  events={events5min} />)}
+            {period === "1h"  && chartMode === "sensor" && co2Chart === "co2"  && (events1min === undefined ? <ChartSpinner /> : <ChartCo2  events={events1min} />)}
+            {period === "1h"  && chartMode === "sensor" && co2Chart === "eco2" && (events1min === undefined ? <ChartSpinner /> : <ChartEco2 events={events1min} />)}
+            {period === "1h"  && chartMode === "sensor" && co2Chart === "th"   && (events1min === undefined ? <ChartSpinner /> : <ChartTH   events={events1min} />)}
+            {period === "24h" && chartMode === "sensor" && co2Chart === "co2"  && (events5min === undefined ? <ChartSpinner /> : <ChartCo2  events={events5min} />)}
+            {period === "24h" && chartMode === "sensor" && co2Chart === "eco2" && (events5min === undefined ? <ChartSpinner /> : <ChartEco2 events={events5min} />)}
+            {period === "24h" && chartMode === "sensor" && co2Chart === "th"   && (events5min === undefined ? <ChartSpinner /> : <ChartTH   events={events5min} />)}
             {period === "1h"  && chartMode === "online"                        && (events1min === undefined ? <ChartSpinner /> : <ChartOnline events={events1min} />)}
             {period === "24h" && chartMode === "online"                        && (events5min === undefined ? <ChartSpinner /> : <ChartOnline events={events5min} />)}
           </div>
@@ -251,8 +254,8 @@ function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
     datasets: [
       {
         label: "W·h",
-        borderColor: "#7c3aed",
-        backgroundColor: "rgba(124,58,237,0.7)",
+        borderColor: CHART_COLORS.powerConsumed.border,
+        backgroundColor: CHART_COLORS.powerConsumed.background,
         data: dailyEvents.map((e) => e.power),
       },
     ],
@@ -281,8 +284,8 @@ function ChartPower({ events }: { events: SensorEventStat[] }) {
     datasets: [
       {
         label: "W",
-        borderColor: "#ef4444",
-        backgroundColor: "rgba(239,68,68,0.15)",
+        borderColor: CHART_COLORS.power.border,
+        backgroundColor: CHART_COLORS.power.background,
         fill: true,
         tension: 0.3,
         pointRadius: 0,
@@ -317,9 +320,42 @@ function ChartCo2({ events }: { events: SensorEventStat[] }) {
     labels: events.map((r) => fmtTime(r.time)),
     datasets: [
       {
+        label: "CO₂ ppm",
+        borderColor: CHART_COLORS.co2.border,
+        backgroundColor: CHART_COLORS.co2.background,
+        fill: true,
+        tension: 0.3,
+        pointRadius: 0,
+        data: events.map((r) => r.co2Avg),
+      },
+    ],
+  };
+  const options = {
+    responsive: true,
+    animation: { duration: 0 },
+    plugins: {
+      tooltip: { mode: "index" as InteractionMode, intersect: false },
+    },
+    scales: {
+      x: xAxisConfig,
+      y: {
+        min: 400,
+        title: { display: true, text: "ppm" },
+      },
+    },
+  };
+
+  return <Line data={data} options={options} />;
+}
+
+function ChartEco2({ events }: { events: SensorEventStat[] }) {
+  const data = {
+    labels: events.map((r) => fmtTime(r.time)),
+    datasets: [
+      {
         label: "eCO₂ ppm",
-        borderColor: "#10b981",
-        backgroundColor: "rgba(16,185,129,0.15)",
+        borderColor: CHART_COLORS.eco2.border,
+        backgroundColor: CHART_COLORS.eco2.background,
         fill: true,
         tension: 0.3,
         pointRadius: 0,
@@ -351,8 +387,8 @@ function ChartOnline({ events }: { events: SensorEventStat[] }) {
     datasets: [
       {
         label: "Online",
-        borderColor: "#22c55e",
-        backgroundColor: "rgba(34,197,94,0.25)",
+        borderColor: CHART_COLORS.online.border,
+        backgroundColor: CHART_COLORS.online.background,
         fill: true,
         stepped: true,
         pointRadius: 0,
@@ -389,8 +425,8 @@ function ChartTH({ events }: { events: SensorEventStat[] }) {
     datasets: [
       {
         label: "°C",
-        borderColor: "#f97316",
-        backgroundColor: "rgba(249,115,22,0.15)",
+        borderColor: CHART_COLORS.temperature.border,
+        backgroundColor: CHART_COLORS.temperature.background,
         fill: true,
         tension: 0.3,
         pointRadius: 0,
@@ -399,8 +435,8 @@ function ChartTH({ events }: { events: SensorEventStat[] }) {
       },
       {
         label: "H₂O %",
-        borderColor: "#06b6d4",
-        backgroundColor: "rgba(6,182,212,0.1)",
+        borderColor: CHART_COLORS.humidity.border,
+        backgroundColor: CHART_COLORS.humidity.background,
         fill: false,
         tension: 0.3,
         pointRadius: 0,

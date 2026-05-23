@@ -14,20 +14,26 @@ export default class HttpApi {
         this.token = token;
     }
 
-    public async sensors(deviceId: number): Promise<SensorEvent[]> {
+    public async sensorsMulti(deviceIds: number[]): Promise<Record<number, SensorEvent[]>> {
         try {
+            const qs = deviceIds.map(id => `ids=${id}`).join('&');
             const response = await fetch(
-                import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/sensors`,
+                import.meta.env.VITE_API_URL + `/api/sensors?${qs}`,
                 {
                     headers: {
                         'Authorization': 'Bearer ' + this.token,
                     }
                 }
             );
-            return response.json();
+            const data: Record<string, SensorEvent[]> = await response.json();
+            const result: Record<number, SensorEvent[]> = {};
+            for (const [key, value] of Object.entries(data)) {
+                result[Number(key)] = value;
+            }
+            return result;
         } catch (e) {
             console.error((e as Error).message);
-            return [];
+            return {};
         }
     }
 

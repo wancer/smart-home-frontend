@@ -3,6 +3,7 @@
 export class SensorEvent {
     public deviceId: number;
     public time: number;
+    public deviceTime: string;
 
     public power: number;
     public current: number;
@@ -16,7 +17,8 @@ export class SensorEvent {
     constructor(decoded: any) {
         this.deviceId = decoded.deviceId;
         this.time = decoded.time;
-        
+        this.deviceTime = decoded.deviceTime;
+
         this.power = decoded.power;
         this.current = decoded.current;
         this.voltage = decoded.voltage;

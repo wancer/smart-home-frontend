@@ -14,6 +14,11 @@ import Menu from "./page/menu.tsx";
 import { DashboardPage } from "./page/dashboard.tsx";
 import DevicesAdminPage from "./page/devices-admin-page.tsx";
 
+export type DataPoint = { time: number; value: number };
+export type HistoryMap = Record<number, DataPoint[] | undefined>;
+
+const FIVE_MIN_S = 300;
+
 type AuthorizedUserAppProperties = {
   api: HttpApi;
 };
@@ -21,6 +26,7 @@ type AuthorizedUserAppProperties = {
 export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
   const { t } = useTranslation();
   const [devices, setDevices] = useState<DeviceEvent[]>([]);
+  const [historyMap, setHistoryMap] = useState<HistoryMap>({});
   const [isLoading, setLoading] = useState(true); // Loading state
   const [socketUrl] = useState(import.meta.env.VITE_API_URL +'/api/ws?jwt=' + api.token);
   const { lastMessage } = useWebSocket(
@@ -40,14 +46,25 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
         device.state.voltage = exact.voltage;
         device.state.power = exact.power;
         device.state.last = exact.time;
+        device.state.deviceTime = exact.deviceTime;
 
         device.state.co2 = exact.co2;
         device.state.co2e = exact.co2e;
         device.state.temperature = exact.temperature;
         device.state.humidity = exact.humidity;
 
+        const value = device.isEnergySensor() ? exact.power
+                    : device.isCo2Sensor()    ? exact.co2e
+                    : exact.temperature;
+        const now = exact.time;
+        setHistoryMap(prev => {
+          const cutoff = now - FIVE_MIN_S;
+          const existing = (prev[exact.deviceId] ?? []).filter(p => p.time >= cutoff);
+          return { ...prev, [exact.deviceId]: [...existing, { time: now, value }] };
+        });
+
         return;
-      } 
+      }
       
       if (parsed.channel === 'state') {
         console.log('state', parsed)
@@ -62,10 +79,25 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
   }, [lastMessage]);
 
   useEffect(() => {
-    api.devices().then((devices) => {
+    api.devices().then(async (devices) => {
       // devices.sort((a: DeviceEvent, b:DeviceEvent) => (a.name > b.name) ? 1 : -1)
       setDevices(devices);
       setLoading(false);
+
+      Object.values(devices)
+        .filter(d => d.enabled)
+        .forEach(async (device) => {
+          const records = await api.sensors(device.id);
+          const points: DataPoint[] = records
+            .flatMap(s => {
+              const value = device.isEnergySensor() ? s.power
+                          : device.isCo2Sensor()    ? s.co2e
+                          : s.temperature;
+              return value != null ? [{ time: s.time, value }] : [];
+            })
+            .sort((a, b) => a.time - b.time);
+          setHistoryMap(prev => ({ ...prev, [device.id]: points }));
+        });
     });
   }, []);
 
@@ -85,7 +117,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
                 <main className="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4" role="main">
                   <div className="justify-content-between align-items-center border-bottom" style={{paddingBottom: 20}}>
                     <Routes>
-                      <Route index path="/" element={<DashboardPage devices={devices}/>} />
+                      <Route index path="/" element={<DashboardPage devices={devices} historyMap={historyMap} api={api}/>} />
                       <Route path="/device/:idStr" element={<DevicePage api={api} devices={devices} />}/>
                       <Route path="/devices" element={<DevicesAdminPage api={api} devices={devices} onDevicesChange={setDevices} />}/>
                     </Routes>

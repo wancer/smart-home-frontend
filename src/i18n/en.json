@@ -7,13 +7,11 @@
     "updated": "updated"
   },
   "devicePage": {
-    "chart_1h_1m": "1h / 1m",
-    "chart_24h_5min": "24h / 5min",
-    "consumption_30d": "Consumption W·h — 30d / 1d",
-    "eco2_1h": "eCO₂ — 1h / 1m",
-    "eco2_24h": "eCO₂ — 24h / 5min",
-    "th_1h": "Temperature & Humidity — 1h / 1m",
-    "th_24h": "Temperature & Humidity — 24h / 5min"
+    "sensor": "Sensor",
+    "online": "Online",
+    "period_1h": "1h",
+    "period_24h": "24h",
+    "period_30d": "30d"
   },
   "devicesAdmin": {
     "title": "Devices",
@@ -45,7 +43,7 @@
   },
   "configPanel": {
     "section_power": "Power",
-    "section_general": "General",
+    "section_timing": "Timing",
     "section_led": "LED",
     "section_calibration": "Calibration",
     "section_hardware": "Hardware",

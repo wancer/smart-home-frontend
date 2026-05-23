@@ -10,9 +10,20 @@ type Props = {
   device: DeviceEvent;
 };
 
-type Section = "power" | "general" | "led" | "calibration" | "hardware" | null;
+type Section = "power" | "timing" | "led" | "calibration" | "hardware" | null;
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
+
+function advanceDeviceTime(base: string, elapsedMs: number): string {
+  const timePart = base.slice(11); // "HH:MM:SS"
+  const [h, m, s] = timePart.split(":").map(Number);
+  const total = h * 3600 + m * 60 + s + Math.floor(elapsedMs / 1000);
+  const ss = total % 60;
+  const mm = Math.floor(total / 60) % 60;
+  const hh = Math.floor(total / 3600) % 24;
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${base.slice(0, 11)}${pad(hh)}:${pad(mm)}:${pad(ss)}`;
+}
 
 function SaveBtn({ disabled, onClick }: { disabled: boolean; onClick: () => void }) {
   return (
@@ -26,6 +37,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
   const { t } = useTranslation();
   const [inProgress, setInProgress] = useState(false);
   const [openSection, setOpenSection] = useState<Section>(null);
+  const [deviceTime, setDeviceTime] = useState("");
 
   const [sensorsFreq, setSensorsFreq] = useState(-1);
   const [timezone, setTimezone] = useState("");
@@ -64,6 +76,16 @@ export default function DeviceConfigPanel({ api, device }: Props) {
     loadConfig();
   }, [device]);
 
+  useEffect(() => {
+    if (openSection !== "timing") return;
+    const base = device.state.deviceTime;
+    const at = device.state.last * 1000;
+    const tick = () => setDeviceTime(advanceDeviceTime(base, Date.now() - at));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [openSection, device.state.deviceTime, device.state.last]);
+
   const run = async (action: () => Promise<void>) => {
     setInProgress(true);
     await action();
@@ -77,7 +99,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
 
   const sectionTitles: Record<Exclude<Section, null>, string> = {
     power: t('configPanel.section_power'),
-    general: t('configPanel.section_general'),
+    timing: t('configPanel.section_timing'),
     led: t('configPanel.section_led'),
     calibration: t('configPanel.section_calibration'),
     hardware: t('configPanel.section_hardware'),
@@ -91,7 +113,7 @@ export default function DeviceConfigPanel({ api, device }: Props) {
             <i className="fa fa-power-off"></i>
           </Button>
         )}
-        <Button variant="outline-secondary" title={t('configPanel.section_general')} onClick={() => setOpenSection("general")}>
+        <Button variant="outline-secondary" title={t('configPanel.section_timing')} onClick={() => setOpenSection("timing")}>
           <i className="fa fa-clock"></i>
         </Button>
         <Button variant="outline-secondary" title={t('configPanel.section_led')} onClick={() => setOpenSection("led")}>
@@ -123,8 +145,13 @@ export default function DeviceConfigPanel({ api, device }: Props) {
               </Col>
             </Row>
           )}
-          {openSection === "general" && (
+          {openSection === "timing" && (
             <>
+              {deviceTime && (
+                <div className="mb-3 font-monospace text-center" style={{ fontSize: "2rem" }}>
+                  {deviceTime}
+                </div>
+              )}
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgTimezone">
                 <Form.Label column sm="3">{t('configPanel.timezone')}</Form.Label>
                 <Col sm="7">

@@ -2,13 +2,13 @@
 
 export default class SensorEventStat {
     public time: number;
-    public powerConsumed: number;
-    public powerAvg: number;
-    public currentAvg: number;
-    public voltageAvg: number;
-    public co2eAvg: number;
-    public temperatureAvg: number;
-    public humidityAvg: number;
+    public powerConsumed: number | null;
+    public powerAvg: number | null;
+    public currentAvg: number | null;
+    public voltageAvg: number | null;
+    public co2eAvg: number | null;
+    public temperatureAvg: number | null;
+    public humidityAvg: number | null;
 
     constructor(decoded: any) {
         this.time = decoded.time;

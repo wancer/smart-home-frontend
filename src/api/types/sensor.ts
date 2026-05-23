@@ -2,19 +2,21 @@
 
 export default class SensorEvent {
     public deviceId: number;
-    public deviceTime: number;
-    
-    public power: number;
-    public current: number;
-    public voltage: number;
+    public time: number;
+    public deviceTime: string;
 
-    public co2: number;
-    public co2e: number;
-    public temperature: number;
-    public humidity: number;
+    public power: number | null;
+    public current: number | null;
+    public voltage: number | null;
+
+    public co2: number | null;
+    public co2e: number | null;
+    public temperature: number | null;
+    public humidity: number | null;
 
     constructor(decoded: any) {
         this.deviceId = decoded.deviceId;
+        this.time = decoded.time;
         this.deviceTime = decoded.deviceTime;
         this.power = decoded.power;
         this.current = decoded.current;

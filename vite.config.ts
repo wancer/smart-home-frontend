@@ -9,6 +9,7 @@ import { resolve, dirname } from 'node:path'
 // https://vite.dev/config/
 export default defineConfig({
   plugins: [react()],
+  publicDir: `${process.env.VITE_PUBLIC_DIR}`,
   base: '/',
   resolve: {
     alias: {

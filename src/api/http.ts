@@ -14,18 +14,17 @@ export default class HttpApi {
         this.token = token;
     }
 
-    public async sensors(): Promise<SensorEvent[]> {
+    public async sensors(deviceId: number): Promise<SensorEvent[]> {
         try {
             const response = await fetch(
-                import.meta.env.VITE_API_URL + '/api/sensors',                
+                import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/sensors`,
                 {
                     headers: {
                         'Authorization': 'Bearer ' + this.token,
                     }
                 }
             );
-            const parsed = response.json();
-            return parsed;
+            return response.json();
         } catch (e) {
             console.error((e as Error).message);
             return [];

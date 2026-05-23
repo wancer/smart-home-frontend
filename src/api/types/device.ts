@@ -2,9 +2,10 @@
 
 class DeviceState {
     public on: boolean|null;
-	public last: number;
+    public last: number;
+    public deviceTime: string;
 
-	public power: number;
+    public power: number;
     public current: number;
     public voltage: number;
 
@@ -16,6 +17,7 @@ class DeviceState {
     constructor(decoded: any) {
         this.on = decoded.on;
         this.last = decoded.last;
+        this.deviceTime = "";
 
         this.power = decoded.power;
         this.current = decoded.current;

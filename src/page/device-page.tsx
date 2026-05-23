@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { Col } from "react-bootstrap";
 import DeviceConfigPanel from "../element/device-config-panel.tsx";
@@ -59,6 +60,7 @@ function fmtTime(unix: number): string {
 
 type Period = "1h" | "24h" | "30d";
 type Co2Chart = "co2" | "th";
+type ChartMode = "sensor" | "online";
 
 function ButtonSelector<T extends string>({ options, labels, current, onChange }: { options: T[]; labels?: string[]; current: T; onChange: (v: T) => void }) {
   return (
@@ -77,27 +79,40 @@ function ButtonSelector<T extends string>({ options, labels, current, onChange }
 }
 
 export function DevicePage({ api, devices }: DevicePageProperties) {
-const { idStr } = useParams();
+  const { t } = useTranslation();
+  const { idStr } = useParams();
   const deviceId = typeof idStr === "undefined" ? 0 : +idStr;
 
   let device = devices[deviceId];
 
-  const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[]>([]);
-  const [events5min, setEvents5min] = useState<SensorEventStat[]>([]);
-  const [events1min, setEvents1min] = useState<SensorEventStat[]>([]);
-  const [period, setPeriod] = useState<Period>("1h");
+  const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[] | undefined>(undefined);
+  const [events5min, setEvents5min] = useState<SensorEventStat[] | undefined>(undefined);
+  const [events1min, setEvents1min] = useState<SensorEventStat[] | undefined>(undefined);
+  const [period, setPeriod] = useState<Period>("24h");
   const [co2Chart, setCo2Chart] = useState<Co2Chart>("co2");
+  const [chartMode, setChartMode] = useState<ChartMode>("sensor");
 
   useEffect(() => {
-    setEvents5min([]);
-    setEvents1min([]);
-    setPeriod("1h");
+    setEvents5min(undefined);
+    setEvents1min(undefined);
+    setEventsMonthly(undefined);
+    setPeriod("24h");
     setCo2Chart("co2");
+    setChartMode("sensor");
 
-    api.sensorsDaily(deviceId).then(setEventsMonthly);
     api.sensorsConfigurable(deviceId, "24h", "5m").then(setEvents5min);
-    api.sensorsConfigurable(deviceId, "1h", "1m").then(setEvents1min);
   }, [deviceId]);
+
+  function changePeriod(newPeriod: Period) {
+    setPeriod(newPeriod);
+    if (newPeriod === "30d") setChartMode("sensor");
+    if (newPeriod === "1h" && events1min === undefined) {
+      api.sensorsConfigurable(deviceId, "1h", "1m").then(setEvents1min);
+    }
+    if (newPeriod === "30d" && eventsMonthly === undefined) {
+      api.sensorsDaily(deviceId).then(setEventsMonthly);
+    }
+  }
 
   return (
     <>
@@ -133,11 +148,14 @@ const { idStr } = useParams();
 
           <div className="row">
             <div className="d-flex gap-2">
-              <ButtonSelector options={["1h", "24h", "30d"]} current={period} onChange={setPeriod} />
+              <ButtonSelector options={["1h", "24h", "30d"]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h"), t("devicePage.period_30d")]} current={period} onChange={changePeriod} />
+              {period !== "30d" && <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />}
             </div>
-            {period === "1h" && <ChartPower events={events1min} />}
-            {period === "24h" && <ChartPower events={events5min} />}
-            {period === "30d" && <ChartDailyConsumption dailyEvents={eventsMonthly} />}
+            {period === "1h"  && chartMode === "sensor" && (events1min === undefined    ? <ChartSpinner /> : <ChartPower events={events1min} />)}
+            {period === "24h" && chartMode === "sensor" && (events5min === undefined    ? <ChartSpinner /> : <ChartPower events={events5min} />)}
+            {period === "30d"                           && (eventsMonthly === undefined ? <ChartSpinner /> : <ChartDailyConsumption dailyEvents={eventsMonthly} />)}
+            {period === "1h"  && chartMode === "online" && (events1min === undefined    ? <ChartSpinner /> : <ChartOnline events={events1min} />)}
+            {period === "24h" && chartMode === "online" && (events5min === undefined    ? <ChartSpinner /> : <ChartOnline events={events5min} />)}
           </div>
         </>
       ) }
@@ -166,13 +184,16 @@ const { idStr } = useParams();
 
           <div className="row">
             <div className="d-flex gap-2">
-              <ButtonSelector options={["1h", "24h"]} current={period} onChange={setPeriod} />
-              <ButtonSelector options={["co2", "th"]} labels={["CO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />
+              <ButtonSelector options={["1h", "24h"]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
+              {chartMode === "sensor" && <ButtonSelector options={["co2", "th"]} labels={["CO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />}
+              <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
             </div>
-            {period === "1h" && co2Chart === "co2" && <ChartCo2 events={events1min} />}
-            {period === "1h" && co2Chart === "th"  && <ChartTH  events={events1min} />}
-            {period === "24h" && co2Chart === "co2" && <ChartCo2 events={events5min} />}
-            {period === "24h" && co2Chart === "th"  && <ChartTH  events={events5min} />}
+            {period === "1h"  && chartMode === "sensor" && co2Chart === "co2" && (events1min === undefined ? <ChartSpinner /> : <ChartCo2 events={events1min} />)}
+            {period === "1h"  && chartMode === "sensor" && co2Chart === "th"  && (events1min === undefined ? <ChartSpinner /> : <ChartTH  events={events1min} />)}
+            {period === "24h" && chartMode === "sensor" && co2Chart === "co2" && (events5min === undefined ? <ChartSpinner /> : <ChartCo2 events={events5min} />)}
+            {period === "24h" && chartMode === "sensor" && co2Chart === "th"  && (events5min === undefined ? <ChartSpinner /> : <ChartTH  events={events5min} />)}
+            {period === "1h"  && chartMode === "online"                        && (events1min === undefined ? <ChartSpinner /> : <ChartOnline events={events1min} />)}
+            {period === "24h" && chartMode === "online"                        && (events5min === undefined ? <ChartSpinner /> : <ChartOnline events={events5min} />)}
           </div>
         </>
       ) }
@@ -196,14 +217,27 @@ const { idStr } = useParams();
 
           <div className="row">
             <div className="d-flex gap-2">
-              <ButtonSelector options={["1h", "24h"]} current={period} onChange={setPeriod} />
+              <ButtonSelector options={["1h", "24h"]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
+              <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
             </div>
-            {period === "1h" && <ChartTH events={events1min} />}
-            {period === "24h" && <ChartTH events={events5min} />}
+            {period === "1h"  && chartMode === "sensor" && (events1min === undefined ? <ChartSpinner /> : <ChartTH events={events1min} />)}
+            {period === "24h" && chartMode === "sensor" && (events5min === undefined ? <ChartSpinner /> : <ChartTH events={events5min} />)}
+            {period === "1h"  && chartMode === "online" && (events1min === undefined ? <ChartSpinner /> : <ChartOnline events={events1min} />)}
+            {period === "24h" && chartMode === "online" && (events5min === undefined ? <ChartSpinner /> : <ChartOnline events={events5min} />)}
           </div>
         </>
       ) }
     </>
+  );
+}
+
+function ChartSpinner() {
+  return (
+    <div className="text-center py-5">
+      <div className="spinner-border" role="status">
+        <span className="visually-hidden">Loading...</span>
+      </div>
+    </div>
   );
 }
 
@@ -278,36 +312,6 @@ function ChartPower({ events }: { events: SensorEventStat[] }) {
   return <Line data={data} options={options} />;
 }
 
-function ChartConsumption({ events }: { events: SensorEventStat[] }) {
-  const data = {
-    labels: events.map((r) => fmtTime(r.time)),
-    datasets: [
-      {
-        label: "W·h",
-        borderColor: "#7c3aed",
-        backgroundColor: "rgba(124,58,237,0.65)",
-        data: events.map((r) => r.powerConsumed),
-      },
-    ],
-  };
-  const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    plugins: {
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
-    scales: {
-      x: xAxisConfig,
-      y: {
-        min: 0,
-        title: { display: true, text: "W·h" },
-      },
-    },
-  };
-
-  return <Bar data={data} options={options} />;
-}
-
 function ChartCo2({ events }: { events: SensorEventStat[] }) {
   const data = {
     labels: events.map((r) => fmtTime(r.time)),
@@ -338,6 +342,44 @@ function ChartCo2({ events }: { events: SensorEventStat[] }) {
     },
   };
 
+  return <Line data={data} options={options} />;
+}
+
+function ChartOnline({ events }: { events: SensorEventStat[] }) {
+  const data = {
+    labels: events.map((r) => fmtTime(r.time)),
+    datasets: [
+      {
+        label: "Online",
+        borderColor: "#22c55e",
+        backgroundColor: "rgba(34,197,94,0.25)",
+        fill: true,
+        stepped: true,
+        pointRadius: 0,
+        data: events.map((r) =>
+          r.powerAvg != null || r.co2eAvg != null || r.temperatureAvg != null ? 1 : 0
+        ),
+      },
+    ],
+  };
+  const options = {
+    responsive: true,
+    animation: { duration: 0 },
+    plugins: {
+      tooltip: { mode: "index" as InteractionMode, intersect: false },
+    },
+    scales: {
+      x: xAxisConfig,
+      y: {
+        min: 0,
+        max: 1,
+        ticks: {
+          stepSize: 1,
+          callback: (v: string | number) => (v === 1 ? "online" : "offline"),
+        },
+      },
+    },
+  };
   return <Line data={data} options={options} />;
 }
 

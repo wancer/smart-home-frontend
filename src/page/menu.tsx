@@ -13,10 +13,12 @@ type MenuProperties = {
   devices: DeviceEvent[];
 };
 
+const SEPARATOR = { borderTop: "1px solid rgba(128,128,128,0.2)", marginTop: 8, paddingTop: 8 };
+
 function MenuRow(device: DeviceEvent, key: string, onClick: MouseEventHandler<HTMLAnchorElement>) {
   return (
     <li key={key}>
-      <Link to={"/device/" + device.id} className="nav-link" onClick={ onClick } >
+      <Link to={"/device/" + device.id} className="nav-link" onClick={onClick}>
         <PowerIcon device={device} />
         {device.name}
       </Link>
@@ -62,68 +64,70 @@ function LangSwitcher() {
   );
 }
 
-export default function Menu({ devices }: MenuProperties) {
+function NavLinks({ devices, onClose }: { devices: DeviceEvent[]; onClose: MouseEventHandler<HTMLAnchorElement> }) {
   const { t } = useTranslation();
+
+  return (
+    <div className="sidebar-sticky">
+      {/* Section 1: main nav */}
+      <ul className="nav flex-column">
+        <li className="nav-item">
+          <Link to={"/"} className="nav-link" onClick={onClose}>
+            <i className="fa-solid fa-gauge"></i> {t('menu.dashboard')}
+          </Link>
+        </li>
+        <li className="nav-item">
+          <Link to={"/report"} className="nav-link" onClick={onClose}>
+            <i className="fa-solid fa-chart-bar"></i> {t('menu.report')}
+          </Link>
+        </li>
+      </ul>
+
+      {/* Section 2: device list */}
+      <ul className="nav flex-column" style={SEPARATOR}>
+        {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) =>
+          MenuRow(device, "menu-device-" + device.id, onClose)
+        )}
+      </ul>
+
+      {/* Section 3: settings */}
+      <ul className="nav flex-column mt-auto" style={SEPARATOR}>
+        <li className="nav-item">
+          <Link to={"/devices"} className="nav-link" onClick={onClose}>
+            <i className="fa-solid fa-gear"></i> {t('menu.settings')}
+          </Link>
+        </li>
+        <li className="nav-item d-flex align-items-center">
+          <LangSwitcher />
+          <ThemeToggle />
+        </li>
+      </ul>
+    </div>
+  );
+}
+
+export default function Menu({ devices }: MenuProperties) {
   const [show, setShow] = useState(false);
 
   const handleClose = () => setShow(false);
   const handleShow = () => setShow(true);
+  const noOp: MouseEventHandler<HTMLAnchorElement> = () => {};
 
   return (
     <>
       <Nav className="col-md-3 col-lg-2 d-none d-sm-none d-md-block sidebar">
-        <div className="sidebar-sticky">
-          <ul className="nav flex-column">
-            <li className="nav-item">
-              <Link to={"/"} className="nav-link">
-                <i className={"fa-solid fa-gauge"}></i> {t('menu.dashboard')}
-              </Link>
-            </li>
-            {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) => MenuRow(device, "menu-desktop-device-" + device.id, () => {}))}
-          </ul>
-          <ul className="nav flex-column mt-auto" style={{borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 8}}>
-            <li className="nav-item">
-              <Link to={"/devices"} className="nav-link">
-                <i className={"fa-solid fa-gear"}></i> {t('menu.devices')}
-              </Link>
-            </li>
-            <li className="nav-item d-flex align-items-center">
-              <LangSwitcher />
-              <ThemeToggle />
-            </li>
-          </ul>
-        </div>
+        <NavLinks devices={devices} onClose={noOp} />
       </Nav>
 
-      <Button variant="secondary" onClick={handleShow} className="col-2 d-block d-md-none" style={{marginLeft: 15}} >
+      <Button variant="secondary" onClick={handleShow} className="col-2 d-block d-md-none" style={{ marginLeft: 15 }}>
         <i className="fa fa-bars"></i>
       </Button>
 
       <Offcanvas show={show} onHide={handleClose}>
         <Offcanvas.Header closeButton />
         <Offcanvas.Body>
-          <Nav className="">
-            <div className="sidebar-sticky">
-              <ul className="nav flex-column">
-                <li className="nav-item">
-                  <Link to={"/"} className="nav-link" onClick={handleClose}>
-                    <i className={"fa-solid fa-gauge"}></i> {t('menu.dashboard')}
-                  </Link>
-                </li>
-                {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) => MenuRow(device, "menu-mobile-device-" + device.id, handleClose))}
-              </ul>
-              <ul className="nav flex-column" style={{borderTop: "1px solid rgba(0,0,0,0.1)", paddingTop: 8, marginTop: 8}}>
-                <li className="nav-item">
-                  <Link to={"/devices"} className="nav-link" onClick={handleClose}>
-                    <i className={"fa-solid fa-gear"}></i> {t('menu.devices')}
-                  </Link>
-                </li>
-                <li className="nav-item d-flex align-items-center">
-                  <LangSwitcher />
-                  <ThemeToggle />
-                </li>
-              </ul>
-            </div>
+          <Nav>
+            <NavLinks devices={devices} onClose={handleClose} />
           </Nav>
         </Offcanvas.Body>
       </Offcanvas>

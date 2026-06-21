@@ -35,6 +35,8 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
   const [form, setForm] = useState<DeviceFormData>(emptyForm);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [wipeTarget, setWipeTarget] = useState<DeviceEvent | null>(null);
+  const [wiping, setWiping] = useState(false);
 
   const openCreate = () => {
     setEditingId(null);
@@ -87,6 +89,19 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
     }
   };
 
+  const handleWipe = async () => {
+    if (!wipeTarget) return;
+    setWiping(true);
+    try {
+      await api.wipeSensorData(wipeTarget.id);
+      setWipeTarget(null);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setWiping(false);
+    }
+  };
+
   const handleDelete = async (device: DeviceEvent) => {
     if (!confirm(t('devicesAdmin.deleteConfirm', { name: device.name }))) return;
     try {
@@ -135,6 +150,9 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
                 <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => openEdit(device)}>
                   <i className="fa-solid fa-pen"></i>
                 </Button>
+                <Button variant="outline-warning" size="sm" className="me-2" onClick={() => setWipeTarget(device)} title={t('devicesAdmin.wipeSensorData')}>
+                  <i className="fa-solid fa-broom"></i>
+                </Button>
                 <Button variant="outline-danger" size="sm" onClick={() => handleDelete(device)}>
                   <i className="fa-solid fa-trash"></i>
                 </Button>
@@ -148,6 +166,21 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
           )}
         </tbody>
       </Table>
+
+      <Modal show={wipeTarget !== null} onHide={() => setWipeTarget(null)}>
+        <Modal.Header closeButton>
+          <Modal.Title>{t('devicesAdmin.wipeSensorData')}</Modal.Title>
+        </Modal.Header>
+        <Modal.Body>
+          {t('devicesAdmin.wipeConfirm', { name: wipeTarget?.name })}
+        </Modal.Body>
+        <Modal.Footer>
+          <Button variant="secondary" onClick={() => setWipeTarget(null)}>{t('devicesAdmin.cancel')}</Button>
+          <Button variant="danger" onClick={handleWipe} disabled={wiping}>
+            {wiping ? t('devicesAdmin.wiping') : t('devicesAdmin.wipeConfirmBtn')}
+          </Button>
+        </Modal.Footer>
+      </Modal>
 
       <Modal show={showModal} onHide={() => setShowModal(false)}>
         <Modal.Header closeButton>

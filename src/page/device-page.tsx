@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { Col } from "react-bootstrap";
@@ -41,12 +41,75 @@ import { CHART_COLORS } from "../chart-colors.ts";
 import HttpApi from "../api/http.ts";
 import SensorDailyEvent from "../api/types/sensor-daily.ts";
 import SensorEventStat from "../api/types/sensor-event-stat.ts";
+import { SensorEvent } from "../api/types/ws-event.ts";
 import PowerIcon from "../element/power-icon.tsx";
 
 type DevicePageProperties = {
   api: HttpApi;
   devices: DeviceEvent[];
+  latestSensorEvent: SensorEvent | null;
 };
+
+function weightedAvg(prev: number | null | undefined, next: number, n: number): number {
+  if (n === 1 || prev == null) return next;
+  return (prev * (n - 1) + next) / n;
+}
+
+function buildBucketStat(bucketTime: number, e: SensorEvent, prev: SensorEventStat | null, n: number, device: DeviceEvent): SensorEventStat {
+  const stat: any = {
+    time: bucketTime,
+    powerConsumed: prev?.powerConsumed ?? null,
+    powerAvg: null,
+    currentAvg: null,
+    voltageAvg: null,
+    co2Avg: null,
+    co2eAvg: null,
+    temperatureAvg: null,
+    humidityAvg: null,
+  };
+
+  if (device.isEnergySensor()) {
+    stat.powerAvg   = weightedAvg(prev?.powerAvg,   e.power,   n);
+    stat.currentAvg = weightedAvg(prev?.currentAvg, e.current, n);
+    stat.voltageAvg = weightedAvg(prev?.voltageAvg, e.voltage, n);
+  }
+
+  if (device.isCo2Sensor()) {
+    stat.co2Avg  = weightedAvg(prev?.co2Avg,  e.co2,  n);
+    stat.co2eAvg = weightedAvg(prev?.co2eAvg, e.co2e, n);
+  }
+
+  if (device.isCo2Sensor() || device.isThSensor()) {
+    stat.temperatureAvg = weightedAvg(prev?.temperatureAvg, e.temperature, n);
+    stat.humidityAvg    = weightedAvg(prev?.humidityAvg,    e.humidity,    n);
+  }
+
+  return new SensorEventStat(stat);
+}
+
+function upsertBucket(
+  events: SensorEventStat[],
+  e: SensorEvent,
+  bucketSize: number,
+  counts: Record<number, number>,
+  device: DeviceEvent,
+): SensorEventStat[] {
+  const bucketTime = Math.floor(e.time / bucketSize) * bucketSize;
+  const last = events.at(-1);
+
+  if (last && last.time === bucketTime) {
+    const n = (counts[bucketTime] ?? 1) + 1;
+    counts[bucketTime] = n;
+    return [...events.slice(0, -1), buildBucketStat(bucketTime, e, last, n, device)];
+  }
+
+  if (!last || bucketTime > last.time) {
+    counts[bucketTime] = 1;
+    return [...events, buildBucketStat(bucketTime, e, null, 1, device)];
+  }
+
+  return events;
+}
 
 const xAxisConfig = {
   ticks: {
@@ -59,9 +122,23 @@ function fmtTime(unix: number): string {
   return new Date(unix * 1000).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" });
 }
 
-type Period = "1h" | "24h" | "30d";
+type Period = "24h" | "30d";
 type Co2Chart = "co2" | "eco2" | "th";
 type ChartMode = "sensor" | "online";
+
+function todayStr(): string {
+  const d = new Date();
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
+}
+
+function dateToTill(dateStr: string): number | undefined {
+  if (dateStr === todayStr()) return undefined;
+  const [y, mo, d] = dateStr.split("-").map(Number);
+  return Math.floor(new Date(y, mo - 1, d + 1).getTime() / 1000);
+}
 
 function ButtonSelector<T extends string>({ options, labels, current, onChange }: { options: T[]; labels?: string[]; current: T; onChange: (v: T) => void }) {
   return (
@@ -79,7 +156,7 @@ function ButtonSelector<T extends string>({ options, labels, current, onChange }
   );
 }
 
-export function DevicePage({ api, devices }: DevicePageProperties) {
+export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProperties) {
   const { t } = useTranslation();
   const { idStr } = useParams();
   const deviceId = typeof idStr === "undefined" ? 0 : +idStr;
@@ -88,31 +165,44 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
 
   const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[] | undefined>(undefined);
   const [events5min, setEvents5min] = useState<SensorEventStat[] | undefined>(undefined);
-  const [events1min, setEvents1min] = useState<SensorEventStat[] | undefined>(undefined);
   const [period, setPeriod] = useState<Period>("24h");
   const [co2Chart, setCo2Chart] = useState<Co2Chart>("co2");
   const [chartMode, setChartMode] = useState<ChartMode>("sensor");
+  const [selectedDate, setSelectedDate] = useState<string>(todayStr());
+  const counts5min = useRef<Record<number, number>>({});
 
   useEffect(() => {
     setEvents5min(undefined);
-    setEvents1min(undefined);
     setEventsMonthly(undefined);
     setPeriod("24h");
     setCo2Chart("co2");
     setChartMode("sensor");
+    setSelectedDate(todayStr());
+    counts5min.current = {};
 
     api.sensorsConfigurable(deviceId, "24h", "5m").then(setEvents5min);
   }, [deviceId]);
 
+  useEffect(() => {
+    if (!latestSensorEvent || latestSensorEvent.deviceId !== deviceId) return;
+    if (selectedDate !== todayStr()) return;
+    const e = latestSensorEvent;
+    setEvents5min(prev => prev ? upsertBucket(prev, e, 300, counts5min.current, device) : prev);
+  }, [latestSensorEvent]);
+
+
   function changePeriod(newPeriod: Period) {
     setPeriod(newPeriod);
     if (newPeriod === "30d") setChartMode("sensor");
-    if (newPeriod === "1h" && events1min === undefined) {
-      api.sensorsConfigurable(deviceId, "1h", "1m").then(setEvents1min);
-    }
     if (newPeriod === "30d" && eventsMonthly === undefined) {
       api.sensorsDaily(deviceId).then(setEventsMonthly);
     }
+  }
+
+  function handleDateChange(newDate: string) {
+    setSelectedDate(newDate);
+    setEvents5min(undefined);
+    api.sensorsConfigurable(deviceId, "24h", "5m", dateToTill(newDate)).then(setEvents5min);
   }
 
   return (
@@ -148,14 +238,13 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
           </div>
 
           <div className="row">
-            <div className="d-flex gap-2">
-              <ButtonSelector options={["1h", "24h", "30d"]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h"), t("devicePage.period_30d")]} current={period} onChange={changePeriod} />
+            <div className="d-flex gap-2 align-items-center">
+              <ButtonSelector options={["24h", "30d"]} labels={[t("devicePage.period_24h"), t("devicePage.period_30d")]} current={period} onChange={changePeriod} />
+              {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
               {period !== "30d" && <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />}
             </div>
-            {period === "1h"  && chartMode === "sensor" && (events1min === undefined    ? <ChartSpinner /> : <ChartPower events={events1min} />)}
             {period === "24h" && chartMode === "sensor" && (events5min === undefined    ? <ChartSpinner /> : <ChartPower events={events5min} />)}
             {period === "30d"                           && (eventsMonthly === undefined ? <ChartSpinner /> : <ChartDailyConsumption dailyEvents={eventsMonthly} />)}
-            {period === "1h"  && chartMode === "online" && (events1min === undefined    ? <ChartSpinner /> : <ChartOnline events={events1min} />)}
             {period === "24h" && chartMode === "online" && (events5min === undefined    ? <ChartSpinner /> : <ChartOnline events={events5min} />)}
           </div>
         </>
@@ -184,18 +273,15 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
           </div>
 
           <div className="row">
-            <div className="d-flex gap-2">
-              <ButtonSelector options={["1h", "24h"]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
+            <div className="d-flex gap-2 align-items-center">
+              <ButtonSelector options={["24h"]} labels={[t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
+              {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
               {chartMode === "sensor" && <ButtonSelector options={["co2", "eco2", "th"]} labels={["CO₂", "eCO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />}
               <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
             </div>
-            {period === "1h"  && chartMode === "sensor" && co2Chart === "co2"  && (events1min === undefined ? <ChartSpinner /> : <ChartCo2  events={events1min} />)}
-            {period === "1h"  && chartMode === "sensor" && co2Chart === "eco2" && (events1min === undefined ? <ChartSpinner /> : <ChartEco2 events={events1min} />)}
-            {period === "1h"  && chartMode === "sensor" && co2Chart === "th"   && (events1min === undefined ? <ChartSpinner /> : <ChartTH   events={events1min} />)}
             {period === "24h" && chartMode === "sensor" && co2Chart === "co2"  && (events5min === undefined ? <ChartSpinner /> : <ChartCo2  events={events5min} />)}
             {period === "24h" && chartMode === "sensor" && co2Chart === "eco2" && (events5min === undefined ? <ChartSpinner /> : <ChartEco2 events={events5min} />)}
             {period === "24h" && chartMode === "sensor" && co2Chart === "th"   && (events5min === undefined ? <ChartSpinner /> : <ChartTH   events={events5min} />)}
-            {period === "1h"  && chartMode === "online"                        && (events1min === undefined ? <ChartSpinner /> : <ChartOnline events={events1min} />)}
             {period === "24h" && chartMode === "online"                        && (events5min === undefined ? <ChartSpinner /> : <ChartOnline events={events5min} />)}
           </div>
         </>
@@ -219,13 +305,12 @@ export function DevicePage({ api, devices }: DevicePageProperties) {
           </div>
 
           <div className="row">
-            <div className="d-flex gap-2">
-              <ButtonSelector options={["1h", "24h"]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
+            <div className="d-flex gap-2 align-items-center">
+              <ButtonSelector options={["24h"]} labels={[t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
+              {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
               <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
             </div>
-            {period === "1h"  && chartMode === "sensor" && (events1min === undefined ? <ChartSpinner /> : <ChartTH events={events1min} />)}
             {period === "24h" && chartMode === "sensor" && (events5min === undefined ? <ChartSpinner /> : <ChartTH events={events5min} />)}
-            {period === "1h"  && chartMode === "online" && (events1min === undefined ? <ChartSpinner /> : <ChartOnline events={events1min} />)}
             {period === "24h" && chartMode === "online" && (events5min === undefined ? <ChartSpinner /> : <ChartOnline events={events5min} />)}
           </div>
         </>
@@ -253,10 +338,10 @@ function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
     labels: dailyEvents.map((e) => e.date),
     datasets: [
       {
-        label: "W·h",
+        label: "kWh",
         borderColor: CHART_COLORS.powerConsumed.border,
         backgroundColor: CHART_COLORS.powerConsumed.background,
-        data: dailyEvents.map((e) => e.power),
+        data: dailyEvents.map((e) => e.power != null ? +e.power.toFixed(3) : null),
       },
     ],
   };
@@ -270,7 +355,7 @@ function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
       x: xAxisConfig,
       y: {
         min: 0,
-        title: { display: true, text: "W·h" },
+        title: { display: true, text: "kWh" },
       },
     },
   };

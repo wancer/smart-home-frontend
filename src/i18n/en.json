@@ -1,7 +1,14 @@
 {
   "menu": {
     "dashboard": "Dashboard",
-    "devices": "Devices"
+    "report": "Report",
+    "settings": "Settings"
+  },
+  "report": {
+    "title": "Monthly Report",
+    "noDevices": "No energy devices configured.",
+    "device": "Device",
+    "total": "Total"
   },
   "dashboard": {
     "updated": "updated"
@@ -9,7 +16,6 @@
   "devicePage": {
     "sensor": "Sensor",
     "online": "Online",
-    "period_1h": "1h",
     "period_24h": "24h",
     "period_30d": "30d"
   },
@@ -31,6 +37,10 @@
     "noDevices": "No devices configured.",
     "nameTopicRequired": "Name and topic are required.",
     "deleteConfirm": "Delete device \"{{name}}\"?",
+    "wipeSensorData": "Wipe Sensor Data",
+    "wipeConfirm": "Delete all sensor history for \"{{name}}\"? This cannot be undone.",
+    "wipeConfirmBtn": "Wipe Data",
+    "wiping": "Wiping…",
     "form_name": "Name",
     "form_topic": "MQTT Topic",
     "form_topicHelp": "Tasmota device topic (e.g. plug-living-room subscribes to tele/plug-living-room/SENSOR). Changes take effect after service restart.",
@@ -68,7 +78,44 @@
     "power": "Power",
     "chip": "Chip",
     "version": "Version",
-    "buildAt": "Build At"
+    "buildAt": "Build At",
+    "loading": "Loading from device…",
+    "section_timers": "Timers",
+    "section_rules": "Rules",
+    "timer": "Timer",
+    "timer_loading": "Fetching timers from device…",
+    "timer_disabled": "disabled",
+    "timer_everyday": "Every day",
+    "timer_enable": "Enable",
+    "timer_time": "Time",
+    "timer_days": "Days",
+    "timer_action": "Action",
+    "timer_repeat": "Repeat",
+    "timer_mode": "Mode",
+    "timer_output": "Output",
+    "timer_action_0": "Off",
+    "timer_action_1": "On",
+    "timer_action_2": "Toggle",
+    "timer_action_3": "Blink",
+    "timer_mode_0": "Absolute",
+    "timer_mode_1": "Sunrise",
+    "timer_mode_2": "Sunset",
+    "rule": "Rule",
+    "rule_loading": "Fetching rules from device…",
+    "rule_disabled": "disabled",
+    "rule_empty": "(empty)",
+    "rule_enable": "Enable",
+    "rule_once": "Once",
+    "rule_text": "Rule text",
+    "rule_placeholder": "ON trigger DO command ENDON",
+    "rule_free": "{{free}} bytes free",
+    "day_0": "Sun",
+    "day_1": "Mon",
+    "day_2": "Tue",
+    "day_3": "Wed",
+    "day_4": "Thu",
+    "day_5": "Fri",
+    "day_6": "Sat"
   },
   "app": {
     "loading": "Loading..."

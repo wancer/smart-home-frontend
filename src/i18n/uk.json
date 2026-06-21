@@ -1,7 +1,14 @@
 {
   "menu": {
     "dashboard": "Панель",
-    "devices": "Пристрої"
+    "report": "Звіт",
+    "settings": "Налаштування"
+  },
+  "report": {
+    "title": "Місячний звіт",
+    "noDevices": "Немає налаштованих енергетичних пристроїв.",
+    "device": "Пристрій",
+    "total": "Всього"
   },
   "dashboard": {
     "updated": "оновлено"
@@ -9,7 +16,6 @@
   "devicePage": {
     "sensor": "Сенсор",
     "online": "Онлайн",
-    "period_1h": "1год",
     "period_24h": "24год",
     "period_30d": "30д"
   },
@@ -31,6 +37,10 @@
     "noDevices": "Пристрої не налаштовані.",
     "nameTopicRequired": "Назва та тема є обов'язковими.",
     "deleteConfirm": "Видалити пристрій \"{{name}}\"?",
+    "wipeSensorData": "Очистити дані сенсорів",
+    "wipeConfirm": "Видалити всю історію сенсорів для \"{{name}}\"? Цю дію неможливо скасувати.",
+    "wipeConfirmBtn": "Очистити",
+    "wiping": "Очищення…",
     "form_name": "Назва",
     "form_topic": "MQTT тема",
     "form_topicHelp": "Тема пристрою Tasmota (напр. plug-living-room підписується на tele/plug-living-room/SENSOR). Зміни набудуть чинності після перезапуску сервісу.",
@@ -68,7 +78,44 @@
     "power": "Потужність",
     "chip": "Чіп",
     "version": "Версія",
-    "buildAt": "Зібрано"
+    "buildAt": "Зібрано",
+    "loading": "Завантаження з пристрою…",
+    "section_timers": "Таймери",
+    "section_rules": "Правила",
+    "timer": "Таймер",
+    "timer_loading": "Завантаження таймерів з пристрою…",
+    "timer_disabled": "вимкнено",
+    "timer_everyday": "Щодня",
+    "timer_enable": "Увімкнути",
+    "timer_time": "Час",
+    "timer_days": "Дні",
+    "timer_action": "Дія",
+    "timer_repeat": "Повторювати",
+    "timer_mode": "Режим",
+    "timer_output": "Вихід",
+    "timer_action_0": "Вимкнути",
+    "timer_action_1": "Увімкнути",
+    "timer_action_2": "Перемкнути",
+    "timer_action_3": "Блимати",
+    "timer_mode_0": "Абсолютний",
+    "timer_mode_1": "Схід сонця",
+    "timer_mode_2": "Захід сонця",
+    "rule": "Правило",
+    "rule_loading": "Завантаження правил з пристрою…",
+    "rule_disabled": "вимкнено",
+    "rule_empty": "(порожнє)",
+    "rule_enable": "Увімкнути",
+    "rule_once": "Одноразово",
+    "rule_text": "Текст правила",
+    "rule_placeholder": "ON тригер DO команда ENDON",
+    "rule_free": "{{free}} байт вільно",
+    "day_0": "Нд",
+    "day_1": "Пн",
+    "day_2": "Вт",
+    "day_3": "Ср",
+    "day_4": "Чт",
+    "day_5": "Пт",
+    "day_6": "Сб"
   },
   "app": {
     "loading": "Завантаження..."

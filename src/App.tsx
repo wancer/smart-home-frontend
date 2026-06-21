@@ -13,6 +13,7 @@ import { Container, Row, Spinner } from 'react-bootstrap';
 import Menu from "./page/menu.tsx";
 import { DashboardPage } from "./page/dashboard.tsx";
 import DevicesAdminPage from "./page/devices-admin-page.tsx";
+import ReportPage from "./page/report-page.tsx";
 
 export type DataPoint = { time: number; value: number };
 export type HistoryMap = Record<number, DataPoint[] | undefined>;
@@ -28,6 +29,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
   const [devices, setDevices] = useState<DeviceEvent[]>([]);
   const [historyMap, setHistoryMap] = useState<HistoryMap>({});
   const [isLoading, setLoading] = useState(true); // Loading state
+  const [latestSensorEvent, setLatestSensorEvent] = useState<SensorEvent | null>(null);
   const [socketUrl] = useState(import.meta.env.VITE_API_URL +'/api/ws?jwt=' + api.token);
   const { lastMessage } = useWebSocket(
     socketUrl,
@@ -52,6 +54,8 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
         device.state.co2e = exact.co2e;
         device.state.temperature = exact.temperature;
         device.state.humidity = exact.humidity;
+
+        setLatestSensorEvent(exact);
 
         const value = device.isEnergySensor() ? exact.power
                     : device.isCo2Sensor()    ? exact.co2
@@ -119,8 +123,9 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
                   <div className="justify-content-between align-items-center border-bottom" style={{paddingBottom: 20}}>
                     <Routes>
                       <Route index path="/" element={<DashboardPage devices={devices} historyMap={historyMap} api={api}/>} />
-                      <Route path="/device/:idStr" element={<DevicePage api={api} devices={devices} />}/>
+                      <Route path="/device/:idStr" element={<DevicePage api={api} devices={devices} latestSensorEvent={latestSensorEvent} />}/>
                       <Route path="/devices" element={<DevicesAdminPage api={api} devices={devices} onDevicesChange={setDevices} />}/>
+                      <Route path="/report" element={<ReportPage api={api} devices={devices} />}/>
                     </Routes>
                   </div>
                 </main>

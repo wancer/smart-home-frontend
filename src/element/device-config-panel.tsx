@@ -1,8 +1,10 @@
 import { useState, useEffect } from "react";
-import { Row, Col, Button, ButtonGroup, Form, Modal } from "react-bootstrap";
+import { Row, Col, Button, ButtonGroup, Form, Modal, Accordion } from "react-bootstrap";
 import { useTranslation } from "react-i18next";
 import HttpApi from "../api/http";
 import DeviceEvent from "../api/types/device";
+import Timer from "../api/types/timer";
+import Rule from "../api/types/rule";
 import timezones from '../page/timezones';
 
 type Props = {
@@ -10,7 +12,7 @@ type Props = {
   device: DeviceEvent;
 };
 
-type Section = "power" | "timing" | "led" | "calibration" | "hardware" | null;
+type Section = "power" | "timing" | "led" | "calibration" | "hardware" | "timers" | "rules" | null;
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
@@ -55,6 +57,16 @@ export default function DeviceConfigPanel({ api, device }: Props) {
   const [firmwareBuiltAt, setFirmwareBuiltAt] = useState("");
   const [hardwareChip, setHardwareChip] = useState<string | null>(null);
 
+  const [timingLoading, setTimingLoading] = useState(false);
+  const [ledLoading, setLedLoading] = useState(false);
+  const [hardwareLoading, setHardwareLoading] = useState(false);
+
+  const [timers, setTimers] = useState<Timer[]>([]);
+  const [timersLoading, setTimersLoading] = useState(false);
+
+  const [rules, setRules] = useState<Rule[]>([]);
+  const [rulesLoading, setRulesLoading] = useState(false);
+
   const loadConfig = () => {
     api.getConfig(device.id).then((config) => {
       setSensorsFreq(config.telePeriod);
@@ -73,8 +85,61 @@ export default function DeviceConfigPanel({ api, device }: Props) {
   useEffect(() => {
     setVoltageState(device.state.voltage);
     setPowerState(device.state.power);
-    loadConfig();
   }, [device]);
+
+  useEffect(() => {
+    if (openSection !== "timing") return;
+    setTimingLoading(true);
+    api.getTiming(device.id).then(data => {
+      if (data.telePeriod != null) setSensorsFreq(data.telePeriod);
+      if (data.timezone != null) setTimezone(data.timezone);
+      setTimingLoading(false);
+    }).catch(() => setTimingLoading(false));
+  }, [openSection]);
+
+  useEffect(() => {
+    if (openSection !== "led") return;
+    setLedLoading(true);
+    api.getLed(device.id).then(data => {
+      if (data.ledPower != null) setLedPower(data.ledPower);
+      if (data.ledState != null) setLedMode(data.ledState);
+      if (data.ledPwmMode != null) setLedPwmMode(data.ledPwmMode);
+      if (data.ledPwmOn != null) setLedPwmOn(data.ledPwmOn);
+      if (data.ledPwmOff != null) setLedPwmOff(data.ledPwmOff);
+      setLedLoading(false);
+    }).catch(() => setLedLoading(false));
+  }, [openSection]);
+
+  useEffect(() => {
+    if (openSection !== "hardware") return;
+    setHardwareLoading(true);
+    api.getHardware(device.id).then(data => {
+      setHardwareChip(data.hardware);
+      setFirmwareVersion(data.firmware.version ?? "");
+      setFirmwareBuiltAt(data.firmware.buildAt ?? "");
+      setHardwareLoading(false);
+    }).catch(() => setHardwareLoading(false));
+  }, [openSection]);
+
+  useEffect(() => {
+    if (openSection !== "timers") return;
+    setTimersLoading(true);
+    setTimers([]);
+    api.getTimers(device.id).then(result => {
+      setTimers(result);
+      setTimersLoading(false);
+    }).catch(() => setTimersLoading(false));
+  }, [openSection]);
+
+  useEffect(() => {
+    if (openSection !== "rules") return;
+    setRulesLoading(true);
+    setRules([]);
+    api.getRules(device.id).then(result => {
+      setRules(result);
+      setRulesLoading(false);
+    }).catch(() => setRulesLoading(false));
+  }, [openSection]);
 
   useEffect(() => {
     if (openSection !== "timing") return;
@@ -97,12 +162,41 @@ export default function DeviceConfigPanel({ api, device }: Props) {
   const switchOnOff = () =>
     run(() => api.control(device.id, "on-off", device.state.on ? "OFF" : "ON"));
 
+  const updateTimer = (idx: number, field: keyof Timer, value: number | string) => {
+    setTimers(prev => prev.map((t, i) => i === idx ? new Timer({ ...t, [field]: value }) : t));
+  };
+
+  const saveTimer = (idx: number) =>
+    run(() => api.setTimer(device.id, timers[idx].n, timers[idx]));
+
+  const updateRule = (idx: number, field: keyof Rule, value: number | string) => {
+    setRules(prev => prev.map((r, i) => i === idx ? new Rule({ ...r, [field]: value }) : r));
+  };
+
+  const saveRule = (idx: number) =>
+    run(() => api.setRule(device.id, rules[idx].n, rules[idx]));
+
+  // Tasmota days string: index 0=Sun,1=Mon,...,6=Sat. Display order: Mon first.
+  const dayDisplayOrder = [1, 2, 3, 4, 5, 6, 0];
+
+  const timerDaySummary = (days: string): string => {
+    if (!days || days.length < 7) return "";
+    if (days === "1111111") return t('configPanel.timer_everyday');
+    if (days === "0000000") return "";
+    return dayDisplayOrder
+      .filter(i => days[i] === "1")
+      .map(i => t(`configPanel.day_${i}`))
+      .join(" ");
+  };
+
   const sectionTitles: Record<Exclude<Section, null>, string> = {
     power: t('configPanel.section_power'),
     timing: t('configPanel.section_timing'),
     led: t('configPanel.section_led'),
     calibration: t('configPanel.section_calibration'),
     hardware: t('configPanel.section_hardware'),
+    timers: t('configPanel.section_timers'),
+    rules: t('configPanel.section_rules'),
   };
 
   return (
@@ -125,9 +219,15 @@ export default function DeviceConfigPanel({ api, device }: Props) {
         <Button variant="outline-secondary" title={t('configPanel.section_hardware')} onClick={() => setOpenSection("hardware")}>
           <i className="fa fa-microchip"></i>
         </Button>
+        <Button variant="outline-secondary" title={t('configPanel.section_timers')} onClick={() => setOpenSection("timers")}>
+          <i className="fa fa-bell"></i>
+        </Button>
+        <Button variant="outline-secondary" title={t('configPanel.section_rules')} onClick={() => setOpenSection("rules")}>
+          <i className="fa fa-code"></i>
+        </Button>
       </ButtonGroup>
 
-      <Modal show={openSection !== null} onHide={() => setOpenSection(null)}>
+      <Modal show={openSection !== null} onHide={() => setOpenSection(null)} size={(openSection === "timers" || openSection === "rules") ? "lg" : undefined}>
         <Modal.Header closeButton>
           <Modal.Title>{openSection ? sectionTitles[openSection] : ""}</Modal.Title>
         </Modal.Header>
@@ -147,6 +247,12 @@ export default function DeviceConfigPanel({ api, device }: Props) {
           )}
           {openSection === "timing" && (
             <>
+              {timingLoading ? (
+                <div className="text-center py-4 text-muted">
+                  <i className="fa fa-spinner fa-spin me-2"></i>{t('configPanel.loading')}
+                </div>
+              ) : (
+              <>
               {deviceTime && (
                 <div className="mb-3 font-monospace text-center" style={{ fontSize: "2rem" }}>
                   {deviceTime}
@@ -172,10 +278,18 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                   <SaveBtn disabled={inProgress} onClick={() => run(() => api.control(device.id, "tele-period", sensorsFreq.toString()))}/>
                 </Col>
               </Form.Group>
+              </>
+              )}
             </>
           )}
           {openSection === "led" && (
             <>
+              {ledLoading ? (
+                <div className="text-center py-4 text-muted">
+                  <i className="fa fa-spinner fa-spin me-2"></i>{t('configPanel.loading')}
+                </div>
+              ) : (
+              <>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLedOnOff">
                 <Form.Label column sm="3">{t('configPanel.ledOnOff')}</Form.Label>
                 <Col sm="7">
@@ -225,6 +339,8 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                   <SaveBtn disabled={inProgress} onClick={() => run(() => api.control(device.id, "led-pwm-off", ledPwmOff.toString()))}/>
                 </Col>
               </Form.Group>
+              </>
+              )}
             </>
           )}
           {openSection === "calibration" && (
@@ -249,25 +365,208 @@ export default function DeviceConfigPanel({ api, device }: Props) {
               </Form.Group>
             </>
           )}
-          {openSection === "hardware" && (
-            <Form>
-              {hardwareChip && (
-                <Form.Group as={Row} className="mb-3" controlId="cfgChip">
-                  <Form.Label column sm="3">{t('configPanel.chip')}</Form.Label>
-                  <Col sm="9" className="d-flex align-items-center">
-                    <i className="fa fa-microchip me-2 text-secondary"></i>{hardwareChip}
-                  </Col>
-                </Form.Group>
+          {openSection === "timers" && (
+            <>
+              {timersLoading ? (
+                <div className="text-center py-4 text-muted">
+                  <i className="fa fa-spinner fa-spin me-2"></i>{t('configPanel.timer_loading')}
+                </div>
+              ) : (
+                <Accordion style={{ maxHeight: "60vh", overflowY: "auto" }}>
+                  {timers.map((timer, idx) => (
+                    <Accordion.Item eventKey={String(idx)} key={idx}>
+                      <Accordion.Header>
+                        <span className="me-2 fw-semibold">{t('configPanel.timer')} {timer.n}</span>
+                        {timer.enable === 1 ? (
+                          <span className="text-success me-2">
+                            <i className="fa fa-circle-check me-1"></i>
+                            {timer.time}
+                            {timerDaySummary(timer.days) && <span className="ms-2 font-monospace small">{timerDaySummary(timer.days)}</span>}
+                            <span className="ms-2">{t(`configPanel.timer_action_${timer.action}`)}</span>
+                          </span>
+                        ) : (
+                          <span className="text-muted small">{t('configPanel.timer_disabled')}</span>
+                        )}
+                      </Accordion.Header>
+                      <Accordion.Body>
+                        <Form>
+                          <Form.Group as={Row} className="mb-2 align-items-center">
+                            <Form.Label column sm="4">{t('configPanel.timer_enable')}</Form.Label>
+                            <Col sm="8">
+                              <Form.Check type="switch" checked={timer.enable === 1}
+                                onChange={() => updateTimer(idx, 'enable', timer.enable === 1 ? 0 : 1)} />
+                            </Col>
+                          </Form.Group>
+                          <Form.Group as={Row} className="mb-2 align-items-center">
+                            <Form.Label column sm="4">{t('configPanel.timer_time')}</Form.Label>
+                            <Col sm="8">
+                              <Form.Control type="time" value={timer.time}
+                                onChange={e => updateTimer(idx, 'time', e.target.value)} />
+                            </Col>
+                          </Form.Group>
+                          <Form.Group as={Row} className="mb-2 align-items-center">
+                            <Form.Label column sm="4">{t('configPanel.timer_days')}</Form.Label>
+                            <Col sm="8">
+                              <div className="d-flex gap-2">
+                                {dayDisplayOrder.map(tasmotaIdx => (
+                                  <Form.Check key={tasmotaIdx} type="checkbox"
+                                    label={t(`configPanel.day_${tasmotaIdx}`)}
+                                    checked={timer.days[tasmotaIdx] === "1"}
+                                    onChange={() => {
+                                      const d = timer.days.split("");
+                                      d[tasmotaIdx] = d[tasmotaIdx] === "1" ? "0" : "1";
+                                      updateTimer(idx, 'days', d.join(""));
+                                    }} />
+                                ))}
+                              </div>
+                            </Col>
+                          </Form.Group>
+                          <Form.Group as={Row} className="mb-2 align-items-center">
+                            <Form.Label column sm="4">{t('configPanel.timer_action')}</Form.Label>
+                            <Col sm="8">
+                              <Form.Select value={timer.action}
+                                onChange={e => updateTimer(idx, 'action', Number(e.target.value))}>
+                                {([0, 1, 2, 3] as const).map(a => (
+                                  <option key={a} value={a}>{t(`configPanel.timer_action_${a}`)}</option>
+                                ))}
+                              </Form.Select>
+                            </Col>
+                          </Form.Group>
+                          <Form.Group as={Row} className="mb-2 align-items-center">
+                            <Form.Label column sm="4">{t('configPanel.timer_repeat')}</Form.Label>
+                            <Col sm="8">
+                              <Form.Check type="switch" checked={timer.repeat === 1}
+                                onChange={() => updateTimer(idx, 'repeat', timer.repeat === 1 ? 0 : 1)} />
+                            </Col>
+                          </Form.Group>
+                          <Form.Group as={Row} className="mb-2 align-items-center">
+                            <Form.Label column sm="4">{t('configPanel.timer_mode')}</Form.Label>
+                            <Col sm="8">
+                              <Form.Select value={timer.mode}
+                                onChange={e => updateTimer(idx, 'mode', Number(e.target.value))}>
+                                {([0, 1, 2] as const).map(m => (
+                                  <option key={m} value={m}>{t(`configPanel.timer_mode_${m}`)}</option>
+                                ))}
+                              </Form.Select>
+                            </Col>
+                          </Form.Group>
+                          <Form.Group as={Row} className="mb-2 align-items-center">
+                            <Form.Label column sm="4">{t('configPanel.timer_output')}</Form.Label>
+                            <Col sm="8">
+                              <Form.Select value={timer.output}
+                                onChange={e => updateTimer(idx, 'output', Number(e.target.value))}>
+                                {[1, 2, 3, 4].map(o => (
+                                  <option key={o} value={o}>{o}</option>
+                                ))}
+                              </Form.Select>
+                            </Col>
+                          </Form.Group>
+                          <div className="d-flex justify-content-end mt-2">
+                            <SaveBtn disabled={inProgress} onClick={() => saveTimer(idx)} />
+                          </div>
+                        </Form>
+                      </Accordion.Body>
+                    </Accordion.Item>
+                  ))}
+                </Accordion>
               )}
-              <Form.Group as={Row} className="mb-3" controlId="cfgFwVersion">
-                <Form.Label column sm="3">{t('configPanel.version')}</Form.Label>
-                <Col sm="9" className="d-flex align-items-center">{firmwareVersion}</Col>
-              </Form.Group>
-              <Form.Group as={Row} className="mb-3" controlId="cfgFwBuiltAt">
-                <Form.Label column sm="3">{t('configPanel.buildAt')}</Form.Label>
-                <Col sm="9" className="d-flex align-items-center">{firmwareBuiltAt}</Col>
-              </Form.Group>
-            </Form>
+            </>
+          )}
+          {openSection === "rules" && (
+            <>
+              {rulesLoading ? (
+                <div className="text-center py-4 text-muted">
+                  <i className="fa fa-spinner fa-spin me-2"></i>{t('configPanel.rule_loading')}
+                </div>
+              ) : (
+                <Accordion style={{ maxHeight: "60vh", overflowY: "auto" }}>
+                  {rules.map((rule, idx) => (
+                    <Accordion.Item eventKey={String(idx)} key={idx}>
+                      <Accordion.Header>
+                        <span className="me-2 fw-semibold">{t('configPanel.rule')} {rule.n}</span>
+                        {rule.state === 1 ? (
+                          <span className="text-success me-2">
+                            <i className="fa fa-circle-check me-1"></i>
+                            {rule.once === 1 && <span className="badge bg-secondary me-1">{t('configPanel.rule_once')}</span>}
+                            <span className="font-monospace small text-truncate" style={{ maxWidth: "300px", display: "inline-block", verticalAlign: "middle" }}>{rule.rules || t('configPanel.rule_empty')}</span>
+                          </span>
+                        ) : (
+                          <span className="text-muted small">{t('configPanel.rule_disabled')}</span>
+                        )}
+                      </Accordion.Header>
+                      <Accordion.Body>
+                        <Form>
+                          <Form.Group as={Row} className="mb-2 align-items-center">
+                            <Form.Label column sm="4">{t('configPanel.rule_enable')}</Form.Label>
+                            <Col sm="8">
+                              <Form.Check type="switch" checked={rule.state === 1}
+                                onChange={() => updateRule(idx, 'state', rule.state === 1 ? 0 : 1)} />
+                            </Col>
+                          </Form.Group>
+                          <Form.Group as={Row} className="mb-2 align-items-center">
+                            <Form.Label column sm="4">{t('configPanel.rule_once')}</Form.Label>
+                            <Col sm="8">
+                              <Form.Check type="switch" checked={rule.once === 1}
+                                onChange={() => updateRule(idx, 'once', rule.once === 1 ? 0 : 1)} />
+                            </Col>
+                          </Form.Group>
+                          <Form.Group as={Row} className="mb-2">
+                            <Form.Label column sm="4">{t('configPanel.rule_text')}</Form.Label>
+                            <Col sm="8">
+                              <Form.Control
+                                as="textarea"
+                                rows={5}
+                                className="font-monospace"
+                                style={{ fontSize: "0.8rem" }}
+                                value={rule.rules}
+                                onChange={e => updateRule(idx, 'rules', e.target.value)}
+                                placeholder={t('configPanel.rule_placeholder')}
+                              />
+                              {rule.free > 0 && (
+                                <Form.Text className="text-muted">
+                                  {t('configPanel.rule_free', { free: rule.free })}
+                                </Form.Text>
+                              )}
+                            </Col>
+                          </Form.Group>
+                          <div className="d-flex justify-content-end mt-2">
+                            <SaveBtn disabled={inProgress} onClick={() => saveRule(idx)} />
+                          </div>
+                        </Form>
+                      </Accordion.Body>
+                    </Accordion.Item>
+                  ))}
+                </Accordion>
+              )}
+            </>
+          )}
+          {openSection === "hardware" && (
+            <>
+              {hardwareLoading ? (
+                <div className="text-center py-4 text-muted">
+                  <i className="fa fa-spinner fa-spin me-2"></i>{t('configPanel.loading')}
+                </div>
+              ) : (
+              <Form>
+                {hardwareChip && (
+                  <Form.Group as={Row} className="mb-3" controlId="cfgChip">
+                    <Form.Label column sm="3">{t('configPanel.chip')}</Form.Label>
+                    <Col sm="9" className="d-flex align-items-center">
+                      <i className="fa fa-microchip me-2 text-secondary"></i>{hardwareChip}
+                    </Col>
+                  </Form.Group>
+                )}
+                <Form.Group as={Row} className="mb-3" controlId="cfgFwVersion">
+                  <Form.Label column sm="3">{t('configPanel.version')}</Form.Label>
+                  <Col sm="9" className="d-flex align-items-center">{firmwareVersion}</Col>
+                </Form.Group>
+                <Form.Group as={Row} className="mb-3" controlId="cfgFwBuiltAt">
+                  <Form.Label column sm="3">{t('configPanel.buildAt')}</Form.Label>
+                  <Col sm="9" className="d-flex align-items-center">{firmwareBuiltAt}</Col>
+                </Form.Group>
+              </Form>
+              )}
+            </>
           )}
         </Modal.Body>
       </Modal>

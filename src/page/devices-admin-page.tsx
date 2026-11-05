@@ -94,6 +94,15 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
     setWiping(true);
     try {
       await api.wipeSensorData(wipeTarget.id);
+      // Wipe clears aggregates and daily only; archived is untouched.
+      const target = wipeTarget;
+      if (target.sensorHistory) {
+        const updated = { ...devices } as unknown as Record<number, DeviceEvent>;
+        const copy = Object.assign(Object.create(Object.getPrototypeOf(target)), target) as DeviceEvent;
+        copy.sensorHistory = { ...target.sensorHistory, aggregates: 0, daily: 0, oldest: null };
+        updated[target.id] = copy;
+        onDevicesChange(updated as unknown as DeviceEvent[]);
+      }
       setWipeTarget(null);
     } catch (e) {
       alert((e as Error).message);
@@ -134,6 +143,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
             <th>{t('devicesAdmin.col_sensorType')}</th>
             <th>{t('devicesAdmin.col_toggle')}</th>
             <th>{t('devicesAdmin.col_enabled')}</th>
+            <th>{t('devicesAdmin.col_history')}</th>
             <th></th>
           </tr>
         </thead>
@@ -146,6 +156,22 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
               <td>{device.sensorType}</td>
               <td>{device.supportsToggle ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="secondary">{t('devicesAdmin.no')}</Badge>}</td>
               <td>{device.enabled ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="danger">{t('devicesAdmin.no')}</Badge>}</td>
+              <td className="small">
+                {device.sensorHistory ? (
+                  <>
+                    <div>{t('devicesAdmin.history_aggregates')}: {device.sensorHistory.aggregates.toLocaleString()}</div>
+                    <div>{t('devicesAdmin.history_daily')}: {device.sensorHistory.daily.toLocaleString()}</div>
+                    <div>{t('devicesAdmin.history_archived')}: {device.sensorHistory.archived.toLocaleString()}</div>
+                    <div className="text-muted">
+                      {t('devicesAdmin.history_oldest')}: {device.sensorHistory.oldest != null
+                        ? new Date(device.sensorHistory.oldest * 1000).toLocaleDateString()
+                        : '—'}
+                    </div>
+                  </>
+                ) : (
+                  <span className="text-muted">{t('devicesAdmin.history_unknown')}</span>
+                )}
+              </td>
               <td>
                 <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => openEdit(device)}>
                   <i className="fa-solid fa-pen"></i>
@@ -161,7 +187,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
           ))}
           {deviceList.length === 0 && (
             <tr>
-              <td colSpan={7} className="text-center text-muted">{t('devicesAdmin.noDevices')}</td>
+              <td colSpan={8} className="text-center text-muted">{t('devicesAdmin.noDevices')}</td>
             </tr>
           )}
         </tbody>
@@ -173,6 +199,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
         </Modal.Header>
         <Modal.Body>
           {t('devicesAdmin.wipeConfirm', { name: wipeTarget?.name })}
+          <div className="text-muted small mt-2">{t('devicesAdmin.wipeNote')}</div>
         </Modal.Body>
         <Modal.Footer>
           <Button variant="secondary" onClick={() => setWipeTarget(null)}>{t('devicesAdmin.cancel')}</Button>

@@ -30,6 +30,13 @@ class DeviceState {
     }
 }
 
+export type SensorHistory = {
+    aggregates: number;
+    daily: number;
+    archived: number;
+    oldest: number | null;
+};
+
 export default class DeviceEvent {
     public id: number;
     public name: string;
@@ -38,6 +45,7 @@ export default class DeviceEvent {
     public state: DeviceState;
     public sensorType: string;
     public supportsToggle: boolean;
+    public sensorHistory?: SensorHistory;
 
     constructor(decoded: any) {
         this.id = decoded.id;
@@ -47,6 +55,7 @@ export default class DeviceEvent {
         this.state = new DeviceState(decoded.state)
         this.sensorType = decoded.sensorType;
         this.supportsToggle = decoded.supportsToggle;
+        this.sensorHistory = decoded.sensorHistory ?? undefined;
     }
 
     public isEnergySensor(): boolean {

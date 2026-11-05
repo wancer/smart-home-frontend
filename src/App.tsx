@@ -6,7 +6,7 @@ import { SensorEvent, StateEvent } from "./api/types/ws-event.ts";
 import DeviceEvent from "./api/types/device.ts";
 import HttpApi from "./api/http.ts";
 import {DevicePage} from "./page/device-page.tsx"
-import useWebSocket from "react-use-websocket"
+import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket"
 import {BrowserRouter, Routes, Route, } from "react-router-dom";
 import { Container, Row, Spinner } from 'react-bootstrap';
 

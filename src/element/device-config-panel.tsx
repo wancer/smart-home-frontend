@@ -213,9 +213,11 @@ export default function DeviceConfigPanel({ api, device }: Props) {
         <Button variant="outline-secondary" title={t('configPanel.section_led')} onClick={() => setOpenSection("led")}>
           <i className="fa fa-lightbulb"></i>
         </Button>
-        <Button variant="outline-secondary" title={t('configPanel.section_calibration')} onClick={() => setOpenSection("calibration")}>
-          <i className="fa fa-gauge"></i>
-        </Button>
+        {!device.isIrRemote() && (
+          <Button variant="outline-secondary" title={t('configPanel.section_calibration')} onClick={() => setOpenSection("calibration")}>
+            <i className="fa fa-gauge"></i>
+          </Button>
+        )}
         <Button variant="outline-secondary" title={t('configPanel.section_hardware')} onClick={() => setOpenSection("hardware")}>
           <i className="fa fa-microchip"></i>
         </Button>

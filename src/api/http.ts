@@ -7,6 +7,19 @@ import SensorEventStat from "./types/sensor-event-stat";
 import Config from "./types/config";
 import Timer from "./types/timer";
 import Rule from "./types/rule";
+import { IrGroup, IrReceivedCode, IrRule, IrRuleInput, IrSignal, IrSignalInput } from "./types/ir";
+
+export class HttpError extends Error {
+    public status: number;
+    /** Plain-text body of the error response, when the backend sent one. */
+    public detail: string;
+
+    constructor(status: number, detail: string = '') {
+        super(`Response status: ${status}`);
+        this.status = status;
+        this.detail = detail;
+    }
+}
 
 export default class HttpApi {
 
@@ -344,5 +357,124 @@ export default class HttpApi {
         if (!response.ok) {
             throw new Error(`Response status: ${response.status}`);
         }
+    }
+
+    public async irSignals(deviceId: number): Promise<IrGroup[]> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir`,
+            { headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (!response.ok) throw new HttpError(response.status);
+        return response.json();
+    }
+
+    public async createIrSignal(deviceId: number, data: IrSignalInput): Promise<IrSignal> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir`,
+            {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.token,
+                },
+                body: JSON.stringify(data),
+            }
+        );
+        if (!response.ok) throw new HttpError(response.status);
+        return response.json();
+    }
+
+    public async updateIrSignal(deviceId: number, signalId: number, data: IrSignalInput): Promise<IrSignal> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/${signalId}`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.token,
+                },
+                body: JSON.stringify(data),
+            }
+        );
+        if (!response.ok) throw new HttpError(response.status);
+        return response.json();
+    }
+
+    public async deleteIrSignal(deviceId: number, signalId: number): Promise<void> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/${signalId}`,
+            { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (!response.ok) throw new HttpError(response.status);
+    }
+
+    public async sendIrSignal(deviceId: number, signalId: number): Promise<void> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/${signalId}/send`,
+            { method: 'POST', headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (!response.ok) throw new HttpError(response.status);
+    }
+
+    public async irRules(deviceId: number): Promise<IrRule[]> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/rules`,
+            { headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
+        return response.json();
+    }
+
+    public async createIrRule(deviceId: number, data: IrRuleInput): Promise<IrRule> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/rules`,
+            {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.token,
+                },
+                body: JSON.stringify(data),
+            }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
+        return response.json();
+    }
+
+    public async updateIrRule(deviceId: number, ruleId: number, data: IrRuleInput): Promise<IrRule> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/rules/${ruleId}`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.token,
+                },
+                body: JSON.stringify(data),
+            }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
+        return response.json();
+    }
+
+    public async deleteIrRule(deviceId: number, ruleId: number): Promise<void> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/rules/${ruleId}`,
+            { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
+    }
+
+    public async irReceived(deviceId: number): Promise<IrReceivedCode[]> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/received`,
+            { headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
+        return response.json();
     }
 }

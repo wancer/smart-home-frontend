@@ -118,7 +118,9 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
   };
 
   let sparkline: React.ReactNode = null;
-  if (history === undefined) {
+  if (device.isIrRemote()) {
+    sparkline = null;
+  } else if (history === undefined) {
     sparkline = <SparklineSpinner />;
   } else if (device.isEnergySensor()) {
     sparkline = <MiniSparkline points={history} borderColor={CHART_COLORS.power.border} backgroundColor={CHART_COLORS.power.background} />;

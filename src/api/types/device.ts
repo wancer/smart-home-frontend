@@ -60,4 +60,8 @@ export default class DeviceEvent {
     public isThSensor(): boolean {
         return this.sensorType === 't-h';
     }
+
+    public isIrRemote(): boolean {
+        return this.sensorType === 'ir';
+    }
 }

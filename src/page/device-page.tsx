@@ -43,6 +43,7 @@ import SensorDailyEvent from "../api/types/sensor-daily.ts";
 import SensorEventStat from "../api/types/sensor-event-stat.ts";
 import { SensorEvent } from "../api/types/ws-event.ts";
 import PowerIcon from "../element/power-icon.tsx";
+import IrPanel from "../element/ir-panel.tsx";
 
 type DevicePageProperties = {
   api: HttpApi;
@@ -180,7 +181,9 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
     setSelectedDate(todayStr());
     counts5min.current = {};
 
-    api.sensorsConfigurable(deviceId, "24h", "5m").then(setEvents5min);
+    if (!device.isIrRemote()) {
+      api.sensorsConfigurable(deviceId, "24h", "5m").then(setEvents5min);
+    }
   }, [deviceId]);
 
   useEffect(() => {
@@ -214,6 +217,8 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
           <DeviceConfigPanel api={api} device={device} />
         </h2>
       </div>
+
+      { device.isIrRemote() && <IrPanel key={device.id} api={api} device={device} devices={devices} /> }
 
       { device.isEnergySensor() && (
         <>

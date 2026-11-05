@@ -57,6 +57,8 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
 
         setLatestSensorEvent(exact);
 
+        if (device.isIrRemote()) return;
+
         const value = device.isEnergySensor() ? exact.power
                     : device.isCo2Sensor()    ? exact.co2
                     : exact.temperature;
@@ -88,7 +90,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
       setDevices(devices);
       setLoading(false);
 
-      const enabledDevices = Object.values(devices).filter(d => d.enabled);
+      const enabledDevices = Object.values(devices).filter(d => d.enabled && !d.isIrRemote());
       const allRecords = await api.sensorsMulti(enabledDevices.map(d => d.id));
       const newHistoryMap: HistoryMap = {};
       for (const device of enabledDevices) {

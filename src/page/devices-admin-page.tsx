@@ -212,18 +212,20 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
               <Form.Label>{t('devicesAdmin.form_sensorType')}</Form.Label>
               <Form.Select
                 value={form.sensorType}
-                onChange={(e) => setForm({ ...form, sensorType: e.target.value })}
+                onChange={(e) => setForm({ ...form, sensorType: e.target.value, supportsToggle: e.target.value === "ir" ? false : form.supportsToggle })}
               >
                 <option value="energy">{t('devicesAdmin.form_sensorEnergy')}</option>
                 <option value="co2">{t('devicesAdmin.form_sensorCo2')}</option>
                 <option value="t-h">{t('devicesAdmin.form_sensorTH')}</option>
+                <option value="ir">{t('devicesAdmin.form_sensorIr')}</option>
               </Form.Select>
             </Form.Group>
             <Form.Group className="mb-3">
               <Form.Check
                 type="switch"
                 label={t('devicesAdmin.form_supportsToggle')}
-                checked={form.supportsToggle}
+                checked={form.supportsToggle && form.sensorType !== "ir"}
+                disabled={form.sensorType === "ir"}
                 onChange={(e) => setForm({ ...form, supportsToggle: e.target.checked })}
               />
             </Form.Group>

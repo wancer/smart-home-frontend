@@ -278,7 +278,12 @@ export default class HttpApi {
 
     public async getHardware(deviceId: number): Promise<{
         hardware: string | null;
-        firmware: { version: string | null; buildAt: string | null };
+        firmware: {
+            version: string | null;
+            buildAt: string | null;
+            latestVersion: string | null;
+            updateAvailable: boolean;
+        };
     }> {
         const response = await fetch(
             import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/hardware`,
@@ -286,6 +291,16 @@ export default class HttpApi {
         );
         if (!response.ok) throw new Error(`Response status: ${response.status}`);
         return response.json();
+    }
+
+    /** Resolves with the HTTP status (200 or 409); throws on other errors. */
+    public async upgradeFirmware(deviceId: number): Promise<number> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/firmware/upgrade`,
+            { method: 'POST', headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (response.ok || response.status === 409) return response.status;
+        throw new Error(`Response status: ${response.status}`);
     }
 
     public async getRules(deviceId: number): Promise<Rule[]> {

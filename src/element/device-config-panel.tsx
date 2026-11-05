@@ -55,6 +55,10 @@ export default function DeviceConfigPanel({ api, device }: Props) {
 
   const [firmwareVersion, setFirmwareVersion] = useState("");
   const [firmwareBuiltAt, setFirmwareBuiltAt] = useState("");
+  const [latestVersion, setLatestVersion] = useState<string | null>(null);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
+  const [updateStarted, setUpdateStarted] = useState(false);
+  const [updateMsg, setUpdateMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [hardwareChip, setHardwareChip] = useState<string | null>(null);
 
   const [timingLoading, setTimingLoading] = useState(false);
@@ -117,9 +121,30 @@ export default function DeviceConfigPanel({ api, device }: Props) {
       setHardwareChip(data.hardware);
       setFirmwareVersion(data.firmware.version ?? "");
       setFirmwareBuiltAt(data.firmware.buildAt ?? "");
+      setLatestVersion(data.firmware.latestVersion ?? null);
+      setUpdateAvailable(data.firmware.updateAvailable === true);
       setHardwareLoading(false);
     }).catch(() => setHardwareLoading(false));
   }, [openSection]);
+
+  const upgradeFirmware = async () => {
+    if (!window.confirm(t('configPanel.updateConfirm'))) return;
+    setInProgress(true);
+    setUpdateMsg(null);
+    try {
+      const status = await api.upgradeFirmware(device.id);
+      if (status === 409) {
+        setUpdateMsg({ ok: false, text: t('configPanel.updateOffline') });
+      } else {
+        setUpdateStarted(true);
+        setUpdateMsg({ ok: true, text: t('configPanel.updateStarted') });
+      }
+    } catch {
+      setUpdateMsg({ ok: false, text: t('configPanel.updateError') });
+    } finally {
+      setInProgress(false);
+    }
+  };
 
   useEffect(() => {
     if (openSection !== "timers") return;
@@ -560,8 +585,28 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                 )}
                 <Form.Group as={Row} className="mb-3" controlId="cfgFwVersion">
                   <Form.Label column sm="3">{t('configPanel.version')}</Form.Label>
-                  <Col sm="9" className="d-flex align-items-center">{firmwareVersion}</Col>
+                  <Col sm="9" className="d-flex align-items-center">
+                    <span className={latestVersion !== null && !updateAvailable ? "text-success" : undefined}>{firmwareVersion}</span>
+                    {updateAvailable && latestVersion && (
+                      <>
+                        <i className="fa fa-arrow-right mx-2 text-secondary"></i>
+                        <span title={t('configPanel.latestVersion')}>{latestVersion}</span>
+                      </>
+                    )}
+                  </Col>
                 </Form.Group>
+                {updateAvailable && (
+                  <Form.Group as={Row} className="mb-3">
+                    <Col sm={{ span: 9, offset: 3 }}>
+                      <Button variant="warning" size="sm" disabled={inProgress || updateStarted} onClick={upgradeFirmware}>
+                        <i className="fa fa-download me-2"></i>{t('configPanel.updateFirmware')}
+                      </Button>
+                      {updateMsg && (
+                        <div className={"mt-2 " + (updateMsg.ok ? "text-success" : "text-danger")}>{updateMsg.text}</div>
+                      )}
+                    </Col>
+                  </Form.Group>
+                )}
                 <Form.Group as={Row} className="mb-3" controlId="cfgFwBuiltAt">
                   <Form.Label column sm="3">{t('configPanel.buildAt')}</Form.Label>
                   <Col sm="9" className="d-flex align-items-center">{firmwareBuiltAt}</Col>

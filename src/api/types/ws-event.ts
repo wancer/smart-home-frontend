@@ -10,7 +10,6 @@ export class SensorEvent {
     public voltage: number;
 
     public co2: number;
-    public co2e: number;
     public temperature: number;
     public humidity: number;
 
@@ -24,7 +23,6 @@ export class SensorEvent {
         this.voltage = decoded.voltage;
 
         this.co2 = decoded.co2;
-        this.co2e = decoded.co2e;
         this.temperature = decoded.temperature;
         this.humidity = decoded.humidity;
     }

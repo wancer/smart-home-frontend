@@ -64,7 +64,6 @@ function buildBucketStat(bucketTime: number, e: SensorEvent, prev: SensorEventSt
     currentAvg: null,
     voltageAvg: null,
     co2Avg: null,
-    co2eAvg: null,
     temperatureAvg: null,
     humidityAvg: null,
   };
@@ -76,8 +75,7 @@ function buildBucketStat(bucketTime: number, e: SensorEvent, prev: SensorEventSt
   }
 
   if (device.isCo2Sensor()) {
-    stat.co2Avg  = weightedAvg(prev?.co2Avg,  e.co2,  n);
-    stat.co2eAvg = weightedAvg(prev?.co2eAvg, e.co2e, n);
+    stat.co2Avg = weightedAvg(prev?.co2Avg, e.co2, n);
   }
 
   if (device.isCo2Sensor() || device.isThSensor()) {
@@ -124,7 +122,7 @@ function fmtTime(unix: number): string {
 }
 
 type Period = "24h" | "30d";
-type Co2Chart = "co2" | "eco2" | "th";
+type Co2Chart = "co2" | "th";
 type ChartMode = "sensor" | "online";
 
 function todayStr(): string {
@@ -271,7 +269,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
               </Col>
               <Col xs={4}>
                 <h1>
-                  <strong> {device.state.co2e} ppm </strong>
+                  <strong> {device.state.co2} ppm </strong>
                 </h1>
               </Col>
             </div>
@@ -281,11 +279,10 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
             <div className="d-flex gap-2 align-items-center">
               <ButtonSelector options={["24h"]} labels={[t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
               {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
-              {chartMode === "sensor" && <ButtonSelector options={["co2", "eco2", "th"]} labels={["CO₂", "eCO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />}
+              {chartMode === "sensor" && <ButtonSelector options={["co2", "th"]} labels={["CO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />}
               <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
             </div>
             {period === "24h" && chartMode === "sensor" && co2Chart === "co2"  && (events5min === undefined ? <ChartSpinner /> : <ChartCo2  events={events5min} />)}
-            {period === "24h" && chartMode === "sensor" && co2Chart === "eco2" && (events5min === undefined ? <ChartSpinner /> : <ChartEco2 events={events5min} />)}
             {period === "24h" && chartMode === "sensor" && co2Chart === "th"   && (events5min === undefined ? <ChartSpinner /> : <ChartTH   events={events5min} />)}
             {period === "24h" && chartMode === "online"                        && (events5min === undefined ? <ChartSpinner /> : <ChartOnline events={events5min} />)}
           </div>
@@ -438,39 +435,6 @@ function ChartCo2({ events }: { events: SensorEventStat[] }) {
   return <Line data={data} options={options} />;
 }
 
-function ChartEco2({ events }: { events: SensorEventStat[] }) {
-  const data = {
-    labels: events.map((r) => fmtTime(r.time)),
-    datasets: [
-      {
-        label: "eCO₂ ppm",
-        borderColor: CHART_COLORS.eco2.border,
-        backgroundColor: CHART_COLORS.eco2.background,
-        fill: true,
-        tension: 0.3,
-        pointRadius: 0,
-        data: events.map((r) => r.co2eAvg),
-      },
-    ],
-  };
-  const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    plugins: {
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
-    scales: {
-      x: xAxisConfig,
-      y: {
-        min: 400,
-        title: { display: true, text: "ppm" },
-      },
-    },
-  };
-
-  return <Line data={data} options={options} />;
-}
-
 function ChartOnline({ events }: { events: SensorEventStat[] }) {
   const data = {
     labels: events.map((r) => fmtTime(r.time)),
@@ -483,7 +447,7 @@ function ChartOnline({ events }: { events: SensorEventStat[] }) {
         stepped: true,
         pointRadius: 0,
         data: events.map((r) =>
-          r.powerAvg != null || r.co2eAvg != null || r.temperatureAvg != null ? 1 : 0
+          r.powerAvg != null || r.co2Avg != null || r.temperatureAvg != null ? 1 : 0
         ),
       },
     ],

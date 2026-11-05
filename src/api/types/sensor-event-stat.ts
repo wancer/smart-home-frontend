@@ -7,7 +7,6 @@ export default class SensorEventStat {
     public currentAvg: number | null;
     public voltageAvg: number | null;
     public co2Avg: number | null;
-    public co2eAvg: number | null;
     public temperatureAvg: number | null;
     public humidityAvg: number | null;
 
@@ -18,7 +17,6 @@ export default class SensorEventStat {
         this.currentAvg = decoded.currentAvg;
         this.voltageAvg = decoded.voltageAvg;
         this.co2Avg = decoded.co2Avg
-        this.co2eAvg = decoded.co2eAvg
         this.temperatureAvg = decoded.temperatureAvg
         this.humidityAvg = decoded.humidityAvg
     }

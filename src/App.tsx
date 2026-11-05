@@ -51,7 +51,6 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
         device.state.deviceTime = exact.deviceTime;
 
         device.state.co2 = exact.co2;
-        device.state.co2e = exact.co2e;
         device.state.temperature = exact.temperature;
         device.state.humidity = exact.humidity;
 

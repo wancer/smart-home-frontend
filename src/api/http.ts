@@ -8,6 +8,7 @@ import Config from "./types/config";
 import Timer from "./types/timer";
 import Rule from "./types/rule";
 import { IrGroup, IrReceivedCode, IrRule, IrRuleInput, IrSignal, IrSignalInput } from "./types/ir";
+import { DeviceNotifications, NotificationRule, NotificationRuleInput, parseDeviceNotifications, parseNotificationRule } from "./types/notification";
 
 export class HttpError extends Error {
     public status: number;
@@ -491,5 +492,64 @@ export default class HttpApi {
         );
         if (!response.ok) throw new HttpError(response.status, await response.text());
         return response.json();
+    }
+    public async notifications(deviceId: number): Promise<DeviceNotifications> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/notifications`,
+            { headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
+        return parseDeviceNotifications(await response.json());
+    }
+
+    public async createNotification(deviceId: number, data: NotificationRuleInput): Promise<NotificationRule> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/notifications`,
+            {
+                method: 'POST',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.token,
+                },
+                body: JSON.stringify(data),
+            }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
+        return parseNotificationRule(await response.json());
+    }
+
+    public async updateNotification(deviceId: number, ruleId: number, data: NotificationRuleInput): Promise<NotificationRule> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/notifications/${ruleId}`,
+            {
+                method: 'PUT',
+                headers: {
+                    'Accept': 'application/json',
+                    'Content-Type': 'application/json',
+                    'Authorization': 'Bearer ' + this.token,
+                },
+                body: JSON.stringify(data),
+            }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
+        return parseNotificationRule(await response.json());
+    }
+
+    public async deleteNotification(deviceId: number, ruleId: number): Promise<void> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/notifications/${ruleId}`,
+            { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
+    }
+
+    /** 503: Telegram not configured on the server; 502: Telegram rejected the message (detail says why). */
+    public async testNotification(): Promise<void> {
+        const response = await fetch(
+            import.meta.env.VITE_API_URL + '/api/notifications/test',
+            { method: 'POST', headers: { 'Authorization': 'Bearer ' + this.token } }
+        );
+        if (!response.ok) throw new HttpError(response.status, await response.text());
     }
 }

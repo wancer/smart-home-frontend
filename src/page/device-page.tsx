@@ -44,6 +44,7 @@ import SensorEventStat from "../api/types/sensor-event-stat.ts";
 import { SensorEvent } from "../api/types/ws-event.ts";
 import PowerIcon from "../element/power-icon.tsx";
 import IrPanel from "../element/ir-panel.tsx";
+import NotificationRules from "../element/notification-rules.tsx";
 
 type DevicePageProperties = {
   api: HttpApi;
@@ -317,6 +318,8 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
           </div>
         </>
       ) }
+
+      <NotificationRules key={device.id} api={api} device={device} />
     </>
   );
 }

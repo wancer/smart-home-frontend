@@ -8,6 +8,8 @@ import { useTranslation } from "react-i18next";
 import DeviceEvent from "../api/types/device";
 import PowerIcon from "../element/power-icon";
 import { themeManager, Theme } from "../ThemeManager";
+import { authSession } from "../api/auth";
+import { googleLogout } from "@react-oauth/google";
 
 type MenuProperties = {
   devices: DeviceEvent[];
@@ -41,6 +43,21 @@ function ThemeToggle() {
   );
 }
 
+function LogoutButton() {
+  const { t } = useTranslation();
+  // No backend logout (tokens can't be revoked): just drop the token locally, and
+  // disable Google auto-select so One Tap doesn't sign straight back in.
+  const logout = () => {
+    googleLogout();
+    authSession.end("logout");
+  };
+  return (
+    <Button variant="outline-secondary" size="sm" onClick={logout} title={t('auth.logout')} style={{ margin: "8px 12px 8px 0" }}>
+      <i className="fa-solid fa-right-from-bracket"></i>
+    </Button>
+  );
+}
+
 function LangSwitcher() {
   const { i18n } = useTranslation();
   const current = i18n.language;
@@ -66,6 +83,9 @@ function LangSwitcher() {
 
 function NavLinks({ devices, onClose }: { devices: DeviceEvent[]; onClose: MouseEventHandler<HTMLAnchorElement> }) {
   const { t } = useTranslation();
+  const enabled = Object.values(devices).filter((d) => d.enabled);
+  const irDevices = enabled.filter((d) => d.isIrRemote());
+  const sensorDevices = enabled.filter((d) => !d.isIrRemote());
 
   return (
     <div className="sidebar-sticky">
@@ -83,14 +103,23 @@ function NavLinks({ devices, onClose }: { devices: DeviceEvent[]; onClose: Mouse
         </li>
       </ul>
 
-      {/* Section 2: device list */}
+      {/* Section 2: IR remotes */}
+      {irDevices.length > 0 && (
+        <ul className="nav flex-column" style={SEPARATOR}>
+          {irDevices.map((device: DeviceEvent) =>
+            MenuRow(device, "menu-ir-" + device.id, onClose)
+          )}
+        </ul>
+      )}
+
+      {/* Section 3: sensors */}
       <ul className="nav flex-column" style={SEPARATOR}>
-        {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) =>
+        {sensorDevices.map((device: DeviceEvent) =>
           MenuRow(device, "menu-device-" + device.id, onClose)
         )}
       </ul>
 
-      {/* Section 3: settings */}
+      {/* Section 4: settings */}
       <ul className="nav flex-column mt-auto" style={SEPARATOR}>
         <li className="nav-item">
           <Link to={"/devices"} className="nav-link" onClick={onClose}>
@@ -100,6 +129,7 @@ function NavLinks({ devices, onClose }: { devices: DeviceEvent[]; onClose: Mouse
         <li className="nav-item d-flex align-items-center">
           <LangSwitcher />
           <ThemeToggle />
+          <LogoutButton />
         </li>
       </ul>
     </div>
@@ -112,6 +142,7 @@ export default function Menu({ devices }: MenuProperties) {
   const handleClose = () => setShow(false);
   const handleShow = () => setShow(true);
   const noOp: MouseEventHandler<HTMLAnchorElement> = () => {};
+  const irDevices = Object.values(devices).filter((d) => d.enabled && d.isIrRemote());
 
   return (
     <>
@@ -119,9 +150,17 @@ export default function Menu({ devices }: MenuProperties) {
         <NavLinks devices={devices} onClose={noOp} />
       </Nav>
 
-      <Button variant="secondary" onClick={handleShow} className="col-2 d-block d-md-none" style={{ marginLeft: 15 }}>
-        <i className="fa fa-bars"></i>
-      </Button>
+      {/* Mobile top bar: menu button + IR remotes as quick links */}
+      <div className="d-flex d-md-none align-items-center flex-wrap gap-2">
+        <Button variant="secondary" onClick={handleShow}>
+          <i className="fa fa-bars"></i>
+        </Button>
+        {irDevices.map((device: DeviceEvent) => (
+          <Link key={"mobile-ir-" + device.id} to={"/device/" + device.id} className="btn btn-outline-secondary">
+            <PowerIcon device={device} /> {device.name}
+          </Link>
+        ))}
+      </div>
 
       <Offcanvas show={show} onHide={handleClose}>
         <Offcanvas.Header closeButton />

@@ -4,11 +4,12 @@ import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SensorEvent, StateEvent } from "./api/types/ws-event.ts";
 import DeviceEvent from "./api/types/device.ts";
-import HttpApi from "./api/http.ts";
+import HttpApi, { HttpError } from "./api/http.ts";
 import {DevicePage} from "./page/device-page.tsx"
 import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket"
 import {BrowserRouter, Routes, Route, } from "react-router-dom";
-import { Container, Row, Spinner } from 'react-bootstrap';
+import { Alert, Button, Container, Row, Spinner } from 'react-bootstrap';
+import { useToasts } from "./element/use-toasts.tsx";
 
 import Menu from "./page/menu.tsx";
 import { DashboardPage } from "./page/dashboard.tsx";
@@ -29,6 +30,9 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
   const [devices, setDevices] = useState<DeviceEvent[]>([]);
   const [historyMap, setHistoryMap] = useState<HistoryMap>({});
   const [isLoading, setLoading] = useState(true); // Loading state
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
+  const { toast, toastNode } = useToasts();
   const [latestSensorEvent, setLatestSensorEvent] = useState<SensorEvent | null>(null);
   const [socketUrl] = useState(import.meta.env.VITE_API_URL +'/api/ws?jwt=' + api.token);
   const { lastMessage } = useWebSocket(
@@ -83,6 +87,18 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
     }
   }, [lastMessage]);
 
+  // Surface API errors that a caller didn't handle itself (4xx/5xx never end the session).
+  useEffect(() => {
+    const onUnhandled = (e: PromiseRejectionEvent) => {
+      if (e.reason instanceof HttpError) {
+        toast(t('app.requestFailed', { status: e.reason.status }), "danger");
+      }
+    };
+    window.addEventListener('unhandledrejection', onUnhandled);
+    return () => window.removeEventListener('unhandledrejection', onUnhandled);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- toast only closes over a state setter
+  }, []);
+
   useEffect(() => {
     api.devices().then(async (devices) => {
       // devices.sort((a: DeviceEvent, b:DeviceEvent) => (a.name > b.name) ? 1 : -1)
@@ -104,8 +120,19 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
           .sort((a, b) => a.time - b.time);
       }
       setHistoryMap(prev => ({ ...prev, ...newHistoryMap }));
+    }).catch((e) => {
+      setLoadError(e instanceof HttpError ? t('app.requestFailed', { status: e.status }) : (e as Error).message);
     });
-  }, []);
+  }, [loadAttempt]);
+
+  if (loadError !== null) {
+    return (
+      <Container className="pt-4">
+        <Alert variant="danger">{t('app.loadFailed')}: {loadError}</Alert>
+        <Button variant="outline-secondary" onClick={() => { setLoadError(null); setLoadAttempt(n => n + 1); }}>{t('app.retry')}</Button>
+      </Container>
+    );
+  }
 
   if (isLoading) {
     return (
@@ -132,5 +159,6 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
                 </main>
             </Row>
         </Container>
+        {toastNode}
     </BrowserRouter>;
 }

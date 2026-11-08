@@ -118,9 +118,7 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
   };
 
   let sparkline: React.ReactNode = null;
-  if (device.isIrRemote()) {
-    sparkline = null;
-  } else if (history === undefined) {
+  if (history === undefined) {
     sparkline = <SparklineSpinner />;
   } else if (device.isEnergySensor()) {
     sparkline = <MiniSparkline points={history} borderColor={CHART_COLORS.power.border} backgroundColor={CHART_COLORS.power.background} />;
@@ -209,7 +207,7 @@ export function DashboardPage({ devices, historyMap, api }: DashboardProperties)
   return (
     <>
       <div className="row">
-        {Object.values(devices).filter((d) => d.enabled).map((device: DeviceEvent) => (
+        {Object.values(devices).filter((d) => d.enabled && !d.isIrRemote()).map((device: DeviceEvent) => (
           <DeviceBlock
             key={"dashboard-block-" + device.id}
             device={device}

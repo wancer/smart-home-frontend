@@ -277,6 +277,17 @@
     "sumBelowFor": "{{metric}} below {{value}} for {{d}}"
   },
   "app": {
-    "loading": "Loading..."
+    "loading": "Loading...",
+    "requestFailed": "Request failed (status {{status}})",
+    "loadFailed": "Could not load devices",
+    "retry": "Retry"
+  },
+  "auth": {
+    "sessionExpired": "Your session has expired. Please sign in again.",
+    "notAllowed": "This Google account is not allowed to access this app.",
+    "rejected": "Sign-in was rejected by the server.",
+    "loginFailed": "Sign-in failed (status {{status}}). Please try again.",
+    "googleFailed": "Google sign-in failed.",
+    "logout": "Log out"
   }
 }

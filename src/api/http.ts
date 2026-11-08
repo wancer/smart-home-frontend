@@ -9,6 +9,9 @@ import Timer from "./types/timer";
 import Rule from "./types/rule";
 import { IrGroup, IrReceivedCode, IrRule, IrRuleInput, IrSignal, IrSignalInput } from "./types/ir";
 import { DeviceNotifications, NotificationRule, NotificationRuleInput, parseDeviceNotifications, parseNotificationRule } from "./types/notification";
+import { authSession } from "./auth";
+
+const API_URL = import.meta.env.VITE_API_URL;
 
 export class HttpError extends Error {
     public status: number;
@@ -22,26 +25,103 @@ export class HttpError extends Error {
     }
 }
 
+/**
+ * Returned once the session has ended (401, expiry, logout). The request is
+ * cancelled rather than rejected: the authorized UI is about to unmount, and a
+ * rejection would only make callers flash "request failed" errors or alerts.
+ */
+function cancelled(): Promise<never> {
+    return new Promise<never>(() => {});
+}
+
+type Method = 'GET' | 'POST' | 'PUT' | 'DELETE';
+
 export default class HttpApi {
 
-    public token
+    /** Current JWT, or "" when signed out. Used for the WebSocket URL. */
+    public get token(): string {
+        return authSession.getToken() ?? '';
+    }
 
-    constructor(token: string) {
-        this.token = token;
+    /**
+     * The single path for authenticated /api/* calls: attaches the Bearer token,
+     * ends the session on 401, throws HttpError on any other non-2xx status
+     * (except `okStatuses`), and leaves the token alone on 4xx/5xx/network errors.
+     */
+    private async call<T>(
+        method: Method,
+        path: string,
+        body: unknown,
+        parse: (r: Response) => Promise<T>,
+        okStatuses: number[] = [],
+    ): Promise<T> {
+        const token = authSession.getToken(); // also ends the session if exp has passed
+        if (token === null) return cancelled();
+        const signal = authSession.signal; // tied to the session this request belongs to
+
+        const headers: Record<string, string> = { 'Authorization': 'Bearer ' + token };
+        if (body !== undefined) {
+            headers['Accept'] = 'application/json';
+            headers['Content-Type'] = 'application/json';
+        }
+
+        try {
+            const response = await fetch(API_URL + path, {
+                method,
+                headers,
+                body: body === undefined ? undefined : JSON.stringify(body),
+                signal,
+            });
+            if (response.status === 401) {
+                // end() is idempotent, and a 401 from an older session must not end a newer one.
+                if (!signal.aborted) authSession.end('expired');
+                return cancelled();
+            }
+            if (!response.ok && !okStatuses.includes(response.status)) {
+                throw new HttpError(response.status, await response.text().catch(() => ''));
+            }
+            return await parse(response);
+        } catch (e) {
+            if (signal.aborted) return cancelled();
+            throw e;
+        }
+    }
+
+    private get<T>(path: string): Promise<T> {
+        return this.call('GET', path, undefined, r => r.json());
+    }
+
+    private sendJson<T>(method: Method, path: string, body: unknown): Promise<T> {
+        return this.call(method, path, body, r => r.json());
+    }
+
+    private send(method: Method, path: string, body?: unknown): Promise<void> {
+        return this.call(method, path, body, async () => {});
+    }
+
+    /**
+     * Unauthenticated, and deliberately outside call(): a 401/403 here is a final
+     * answer (403 = account not allowed), so it is thrown, never treated as expiry.
+     */
+    public async login(google: CredentialResponse): Promise<Login> {
+        const response = await fetch(API_URL + '/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json',
+            },
+            body: JSON.stringify(google),
+        });
+        if (!response.ok) {
+            throw new HttpError(response.status, await response.text().catch(() => ''));
+        }
+        return new Login(await response.json());
     }
 
     public async sensorsMulti(deviceIds: number[]): Promise<Record<number, SensorEvent[]>> {
         try {
             const qs = deviceIds.map(id => `ids=${id}`).join('&');
-            const response = await fetch(
-                import.meta.env.VITE_API_URL + `/api/sensors?${qs}`,
-                {
-                    headers: {
-                        'Authorization': 'Bearer ' + this.token,
-                    }
-                }
-            );
-            const data: Record<string, SensorEvent[]> = await response.json();
+            const data = await this.get<Record<string, SensorEvent[]>>(`/api/sensors?${qs}`);
             const result: Record<number, SensorEvent[]> = {};
             for (const [key, value] of Object.entries(data)) {
                 result[Number(key)] = value;
@@ -53,231 +133,83 @@ export default class HttpApi {
         }
     }
 
-    public async sensorsDaily(deviceId: number, from?: string, till?: string): Promise<SensorDailyEvent[]> {
+    public sensorsDaily(deviceId: number, from?: string, till?: string): Promise<SensorDailyEvent[]> {
         const params = new URLSearchParams();
         if (from) params.set('from', from);
         if (till) params.set('till', till);
         const qs = params.toString() ? '?' + params.toString() : '';
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/sensors/daily${qs}`,
-            {
-                headers: {
-                    'Authorization': 'Bearer ' + this.token,
-                }
-            }
-        );
-        return response.json();
+        return this.get(`/api/devices/${deviceId}/sensors/daily${qs}`);
     }
 
-    public async sensorsConfigurable(deviceId: number, duration: string, scale: string, till?: number): Promise<SensorEventStat[]> {
+    public sensorsConfigurable(deviceId: number, duration: string, scale: string, till?: number): Promise<SensorEventStat[]> {
         const qs = till !== undefined ? `?till=${till}` : '';
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/sensors/${duration}/${scale}${qs}`,
-            {
-                headers: {
-                    'Authorization': 'Bearer ' + this.token,
-                }
-            }
-        );
-        return response.json();
+        return this.get(`/api/devices/${deviceId}/sensors/${duration}/${scale}${qs}`);
     }
 
     public async devices(): Promise<DeviceEvent[]> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + '/api/devices',
-            {
-                headers: {
-                    'Authorization': 'Bearer ' + this.token,
-                }
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-        const parsed = await response.json();
-
-        Object.keys(parsed).map(
-            (key) => { parsed[key] = new DeviceEvent(parsed[key])},
-        );
-
-        return parsed;
+        // Backend returns a map keyed by device id; the app indexes it like an array.
+        const raw = await this.get<Record<string, unknown>>('/api/devices');
+        const parsed: Record<string, DeviceEvent> = {};
+        for (const key of Object.keys(raw)) parsed[key] = new DeviceEvent(raw[key]);
+        return parsed as unknown as DeviceEvent[];
     }
 
-    public async device(deviceId: number): Promise<DeviceEvent> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}`,
-            {
-                headers: {
-                    'Authorization': 'Bearer ' + this.token,
-                }
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-        const parsed = response.json()
-        return parsed;
+    public device(deviceId: number): Promise<DeviceEvent> {
+        return this.get(`/api/devices/${deviceId}`);
     }
 
     public async createDevice(data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean }): Promise<DeviceEvent> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + '/api/devices',
-            {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify(data),
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-        const parsed = await response.json();
-        return new DeviceEvent(parsed);
+        return new DeviceEvent(await this.sendJson('POST', '/api/devices', data));
     }
 
     public async updateDevice(deviceId: number, data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean }): Promise<DeviceEvent> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify(data),
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-        const parsed = await response.json();
-        return new DeviceEvent(parsed);
+        return new DeviceEvent(await this.sendJson('PUT', `/api/devices/${deviceId}`, data));
     }
 
-    public async deleteDevice(deviceId: number): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}`,
-            {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': 'Bearer ' + this.token,
-                },
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
+    public deleteDevice(deviceId: number): Promise<void> {
+        return this.send('DELETE', `/api/devices/${deviceId}`);
     }
 
-    public async login(google: CredentialResponse): Promise<Login> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + '/api/auth/login',
-            {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                },
-                body: JSON.stringify(google),
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-        return response.json()
-    }
-
-    public async getConfig(deviceId: number): Promise<Config> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/control`,
-            {
-                headers: {
-                    'Authorization': 'Bearer ' + this.token,
-                }
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-        return response.json()
+    public getConfig(deviceId: number): Promise<Config> {
+        return this.get(`/api/devices/${deviceId}/control`);
     }
 
     public async getTimers(deviceId: number): Promise<Timer[]> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/timers`,
-            {
-                headers: {
-                    'Authorization': 'Bearer ' + this.token,
-                }
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-        const parsed = await response.json();
-        return parsed.map((t: any) => new Timer(t));
+        const parsed = await this.get<unknown[]>(`/api/devices/${deviceId}/timers`);
+        return parsed.map(t => new Timer(t));
     }
 
-    public async setTimer(deviceId: number, n: number, timer: Timer): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/timers/${n}`,
-            {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify({
-                    enable: timer.enable,
-                    mode: timer.mode,
-                    time: timer.time,
-                    window: timer.window,
-                    days: timer.days,
-                    repeat: timer.repeat,
-                    output: timer.output,
-                    action: timer.action,
-                }),
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
+    public setTimer(deviceId: number, n: number, timer: Timer): Promise<void> {
+        return this.send('POST', `/api/devices/${deviceId}/timers/${n}`, {
+            enable: timer.enable,
+            mode: timer.mode,
+            time: timer.time,
+            window: timer.window,
+            days: timer.days,
+            repeat: timer.repeat,
+            output: timer.output,
+            action: timer.action,
+        });
     }
 
-    public async getLed(deviceId: number): Promise<{
+    public getLed(deviceId: number): Promise<{
         ledState: number | null;
         ledPower: boolean | null;
         ledPwmMode: boolean | null;
         ledPwmOn: number | null;
         ledPwmOff: number | null;
     }> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/led`,
-            { headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new Error(`Response status: ${response.status}`);
-        return response.json();
+        return this.get(`/api/devices/${deviceId}/led`);
     }
 
-    public async getTiming(deviceId: number): Promise<{
+    public getTiming(deviceId: number): Promise<{
         telePeriod: number | null;
         timezone: string | null;
     }> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/timing`,
-            { headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new Error(`Response status: ${response.status}`);
-        return response.json();
+        return this.get(`/api/devices/${deviceId}/timing`);
     }
 
-    public async getHardware(deviceId: number): Promise<{
+    public getHardware(deviceId: number): Promise<{
         hardware: string | null;
         firmware: {
             version: string | null;
@@ -286,270 +218,93 @@ export default class HttpApi {
             updateAvailable: boolean;
         };
     }> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/hardware`,
-            { headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new Error(`Response status: ${response.status}`);
-        return response.json();
+        return this.get(`/api/devices/${deviceId}/hardware`);
     }
 
     /** Resolves with the HTTP status (200 or 409); throws on other errors. */
-    public async upgradeFirmware(deviceId: number): Promise<number> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/firmware/upgrade`,
-            { method: 'POST', headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (response.ok || response.status === 409) return response.status;
-        throw new Error(`Response status: ${response.status}`);
+    public upgradeFirmware(deviceId: number): Promise<number> {
+        return this.call('POST', `/api/devices/${deviceId}/firmware/upgrade`, undefined, async r => r.status, [409]);
     }
 
     public async getRules(deviceId: number): Promise<Rule[]> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/rules`,
-            {
-                headers: {
-                    'Authorization': 'Bearer ' + this.token,
-                }
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
-        const parsed = await response.json();
-        return parsed.map((r: any) => new Rule(r));
+        const parsed = await this.get<unknown[]>(`/api/devices/${deviceId}/rules`);
+        return parsed.map(r => new Rule(r));
     }
 
-    public async setRule(deviceId: number, n: number, rule: Rule): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/rules/${n}`,
-            {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify({
-                    rules: rule.rules,
-                    state: rule.state,
-                    once: rule.once,
-                }),
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
+    public setRule(deviceId: number, n: number, rule: Rule): Promise<void> {
+        return this.send('POST', `/api/devices/${deviceId}/rules/${n}`, {
+            rules: rule.rules,
+            state: rule.state,
+            once: rule.once,
+        });
     }
 
-    public async wipeSensorData(deviceId: number): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/sensors`,
-            {
-                method: 'DELETE',
-                headers: {
-                    'Authorization': 'Bearer ' + this.token,
-                },
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
+    public wipeSensorData(deviceId: number): Promise<void> {
+        return this.send('DELETE', `/api/devices/${deviceId}/sensors`);
     }
 
-    public async control(deviceId: number, parameter: string, value: string): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/control`,
-            {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify({"deviceId": deviceId,"parameter": parameter, "value": value}),
-            }
-        );
-        if (!response.ok) {
-            throw new Error(`Response status: ${response.status}`);
-        }
+    public control(deviceId: number, parameter: string, value: string): Promise<void> {
+        return this.send('POST', `/api/devices/${deviceId}/control`, { "deviceId": deviceId, "parameter": parameter, "value": value });
     }
 
-    public async irSignals(deviceId: number): Promise<IrGroup[]> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir`,
-            { headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new HttpError(response.status);
-        return response.json();
+    public irSignals(deviceId: number): Promise<IrGroup[]> {
+        return this.get(`/api/devices/${deviceId}/ir`);
     }
 
-    public async createIrSignal(deviceId: number, data: IrSignalInput): Promise<IrSignal> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir`,
-            {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify(data),
-            }
-        );
-        if (!response.ok) throw new HttpError(response.status);
-        return response.json();
+    public createIrSignal(deviceId: number, data: IrSignalInput): Promise<IrSignal> {
+        return this.sendJson('POST', `/api/devices/${deviceId}/ir`, data);
     }
 
-    public async updateIrSignal(deviceId: number, signalId: number, data: IrSignalInput): Promise<IrSignal> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/${signalId}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify(data),
-            }
-        );
-        if (!response.ok) throw new HttpError(response.status);
-        return response.json();
+    public updateIrSignal(deviceId: number, signalId: number, data: IrSignalInput): Promise<IrSignal> {
+        return this.sendJson('PUT', `/api/devices/${deviceId}/ir/${signalId}`, data);
     }
 
-    public async deleteIrSignal(deviceId: number, signalId: number): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/${signalId}`,
-            { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new HttpError(response.status);
+    public deleteIrSignal(deviceId: number, signalId: number): Promise<void> {
+        return this.send('DELETE', `/api/devices/${deviceId}/ir/${signalId}`);
     }
 
-    public async sendIrSignal(deviceId: number, signalId: number): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/${signalId}/send`,
-            { method: 'POST', headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new HttpError(response.status);
+    public sendIrSignal(deviceId: number, signalId: number): Promise<void> {
+        return this.send('POST', `/api/devices/${deviceId}/ir/${signalId}/send`);
     }
 
-    public async irRules(deviceId: number): Promise<IrRule[]> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/rules`,
-            { headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
-        return response.json();
+    public irRules(deviceId: number): Promise<IrRule[]> {
+        return this.get(`/api/devices/${deviceId}/ir/rules`);
     }
 
-    public async createIrRule(deviceId: number, data: IrRuleInput): Promise<IrRule> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/rules`,
-            {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify(data),
-            }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
-        return response.json();
+    public createIrRule(deviceId: number, data: IrRuleInput): Promise<IrRule> {
+        return this.sendJson('POST', `/api/devices/${deviceId}/ir/rules`, data);
     }
 
-    public async updateIrRule(deviceId: number, ruleId: number, data: IrRuleInput): Promise<IrRule> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/rules/${ruleId}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify(data),
-            }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
-        return response.json();
+    public updateIrRule(deviceId: number, ruleId: number, data: IrRuleInput): Promise<IrRule> {
+        return this.sendJson('PUT', `/api/devices/${deviceId}/ir/rules/${ruleId}`, data);
     }
 
-    public async deleteIrRule(deviceId: number, ruleId: number): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/rules/${ruleId}`,
-            { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
+    public deleteIrRule(deviceId: number, ruleId: number): Promise<void> {
+        return this.send('DELETE', `/api/devices/${deviceId}/ir/rules/${ruleId}`);
     }
 
-    public async irReceived(deviceId: number): Promise<IrReceivedCode[]> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/ir/received`,
-            { headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
-        return response.json();
+    public irReceived(deviceId: number): Promise<IrReceivedCode[]> {
+        return this.get(`/api/devices/${deviceId}/ir/received`);
     }
+
     public async notifications(deviceId: number): Promise<DeviceNotifications> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/notifications`,
-            { headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
-        return parseDeviceNotifications(await response.json());
+        return parseDeviceNotifications(await this.get<Parameters<typeof parseDeviceNotifications>[0]>(`/api/devices/${deviceId}/notifications`));
     }
 
     public async createNotification(deviceId: number, data: NotificationRuleInput): Promise<NotificationRule> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/notifications`,
-            {
-                method: 'POST',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify(data),
-            }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
-        return parseNotificationRule(await response.json());
+        return parseNotificationRule(await this.sendJson<Parameters<typeof parseNotificationRule>[0]>('POST', `/api/devices/${deviceId}/notifications`, data));
     }
 
     public async updateNotification(deviceId: number, ruleId: number, data: NotificationRuleInput): Promise<NotificationRule> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/notifications/${ruleId}`,
-            {
-                method: 'PUT',
-                headers: {
-                    'Accept': 'application/json',
-                    'Content-Type': 'application/json',
-                    'Authorization': 'Bearer ' + this.token,
-                },
-                body: JSON.stringify(data),
-            }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
-        return parseNotificationRule(await response.json());
+        return parseNotificationRule(await this.sendJson<Parameters<typeof parseNotificationRule>[0]>('PUT', `/api/devices/${deviceId}/notifications/${ruleId}`, data));
     }
 
-    public async deleteNotification(deviceId: number, ruleId: number): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + `/api/devices/${deviceId}/notifications/${ruleId}`,
-            { method: 'DELETE', headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
+    public deleteNotification(deviceId: number, ruleId: number): Promise<void> {
+        return this.send('DELETE', `/api/devices/${deviceId}/notifications/${ruleId}`);
     }
 
     /** 503: Telegram not configured on the server; 502: Telegram rejected the message (detail says why). */
-    public async testNotification(): Promise<void> {
-        const response = await fetch(
-            import.meta.env.VITE_API_URL + '/api/notifications/test',
-            { method: 'POST', headers: { 'Authorization': 'Bearer ' + this.token } }
-        );
-        if (!response.ok) throw new HttpError(response.status, await response.text());
+    public testNotification(): Promise<void> {
+        return this.send('POST', '/api/notifications/test');
     }
 }

@@ -83,7 +83,9 @@ function LangSwitcher() {
 
 function NavLinks({ devices, onClose }: { devices: DeviceEvent[]; onClose: MouseEventHandler<HTMLAnchorElement> }) {
   const { t } = useTranslation();
-  const enabled = Object.values(devices).filter((d) => d.enabled);
+  const enabled = Object.values(devices)
+    .filter((d) => d.enabled)
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
   const irDevices = enabled.filter((d) => d.isIrRemote());
   const sensorDevices = enabled.filter((d) => !d.isIrRemote());
 
@@ -142,7 +144,9 @@ export default function Menu({ devices }: MenuProperties) {
   const handleClose = () => setShow(false);
   const handleShow = () => setShow(true);
   const noOp: MouseEventHandler<HTMLAnchorElement> = () => {};
-  const irDevices = Object.values(devices).filter((d) => d.enabled && d.isIrRemote());
+  const irDevices = Object.values(devices)
+    .filter((d) => d.enabled && d.isIrRemote())
+    .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }));
 
   return (
     <>

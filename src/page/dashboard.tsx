@@ -207,7 +207,9 @@ export function DashboardPage({ devices, historyMap, api }: DashboardProperties)
   return (
     <>
       <div className="row">
-        {Object.values(devices).filter((d) => d.enabled && !d.isIrRemote()).map((device: DeviceEvent) => (
+        {Object.values(devices).filter((d) => d.enabled && !d.isIrRemote())
+          .sort((a, b) => a.name.localeCompare(b.name, undefined, { numeric: true, sensitivity: "base" }))
+          .map((device: DeviceEvent) => (
           <DeviceBlock
             key={"dashboard-block-" + device.id}
             device={device}

@@ -1,7 +1,7 @@
 /**
  * Single source of truth for the backend JWT.
  *
- * - Token lives in memory, mirrored to sessionStorage so it survives a reload
+ * - Token lives in memory, mirrored to localStorage so it survives a reload
  *   (but not a new tab / browser restart). Never put it in localStorage, never log it.
  * - `exp` is decoded on store; the session ends proactively when it passes.
  * - `end()` is idempotent: however many requests hit 401 at once, listeners
@@ -32,9 +32,7 @@ function decodeExpMs(token: string): number | null {
 
 function readStored(): string | null {
   try {
-    // One-time cleanup: older builds kept the token in localStorage.
-    localStorage.removeItem(STORAGE_KEY);
-    return sessionStorage.getItem(STORAGE_KEY);
+    return localStorage.getItem(STORAGE_KEY);
   } catch {
     return null;
   }
@@ -42,8 +40,8 @@ function readStored(): string | null {
 
 function writeStored(token: string | null) {
   try {
-    if (token === null) sessionStorage.removeItem(STORAGE_KEY);
-    else sessionStorage.setItem(STORAGE_KEY, token);
+    if (token === null) localStorage.removeItem(STORAGE_KEY);
+    else localStorage.setItem(STORAGE_KEY, token);
   } catch {
     // Storage unavailable (private mode etc.) — in-memory token still works.
   }

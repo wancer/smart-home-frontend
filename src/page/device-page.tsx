@@ -217,7 +217,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
         </h2>
       </div>
 
-      { device.isIrRemote() && <IrPanel key={device.id} api={api} device={device} devices={devices} /> }
+      { device.isIrRemote() && <IrPanel key={"ir-" + device.id} api={api} device={device} devices={devices} /> }
 
       { device.isEnergySensor() && (
         <>
@@ -319,7 +319,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
         </>
       ) }
 
-      <NotificationRules key={device.id} api={api} device={device} />
+      <NotificationRules key={"notif-" + device.id} api={api} device={device} />
     </>
   );
 }

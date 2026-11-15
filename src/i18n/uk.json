@@ -60,6 +60,7 @@
     "form_enabled": "Увімкнено"
   },
   "configPanel": {
+    "menu": "Налаштування пристрою",
     "section_power": "Живлення",
     "section_timing": "Синхронізація",
     "section_led": "LED",

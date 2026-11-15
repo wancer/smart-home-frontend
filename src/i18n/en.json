@@ -60,6 +60,7 @@
     "form_enabled": "Enabled"
   },
   "configPanel": {
+    "menu": "Device settings",
     "section_power": "Power",
     "section_timing": "Timing",
     "section_led": "LED",

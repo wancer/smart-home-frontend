@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Row, Col, Button, ButtonGroup, Form, Modal, Accordion } from "react-bootstrap";
+import { Row, Col, Button, ButtonGroup, Dropdown, Form, Modal, Accordion } from "react-bootstrap";
 import { useTranslation } from "react-i18next";
 import HttpApi from "../api/http";
 import DeviceEvent from "../api/types/device";
@@ -224,35 +224,38 @@ export default function DeviceConfigPanel({ api, device }: Props) {
     rules: t('configPanel.section_rules'),
   };
 
+  const menuItems: { section: Exclude<Section, null>; icon: string }[] = [
+    ...(device.supportsToggle ? [{ section: "power" as const, icon: "fa-power-off" }] : []),
+    { section: "timing", icon: "fa-clock" },
+    { section: "led", icon: "fa-lightbulb" },
+    ...(!device.isIrRemote() ? [{ section: "calibration" as const, icon: "fa-gauge" }] : []),
+    { section: "hardware", icon: "fa-microchip" },
+    { section: "timers", icon: "fa-bell" },
+    { section: "rules", icon: "fa-code" },
+  ];
+
   return (
     <>
-      <ButtonGroup size="sm">
-        {device.supportsToggle && (
-          <Button variant="outline-secondary" title={t('configPanel.section_power')} onClick={() => setOpenSection("power")}>
-            <i className="fa fa-power-off"></i>
+      <ButtonGroup size="sm" className="d-none d-md-inline-flex">
+        {menuItems.map(item => (
+          <Button key={item.section} variant="outline-secondary" title={sectionTitles[item.section]} onClick={() => setOpenSection(item.section)}>
+            <i className={"fa " + item.icon}></i>
           </Button>
-        )}
-        <Button variant="outline-secondary" title={t('configPanel.section_timing')} onClick={() => setOpenSection("timing")}>
-          <i className="fa fa-clock"></i>
-        </Button>
-        <Button variant="outline-secondary" title={t('configPanel.section_led')} onClick={() => setOpenSection("led")}>
-          <i className="fa fa-lightbulb"></i>
-        </Button>
-        {!device.isIrRemote() && (
-          <Button variant="outline-secondary" title={t('configPanel.section_calibration')} onClick={() => setOpenSection("calibration")}>
-            <i className="fa fa-gauge"></i>
-          </Button>
-        )}
-        <Button variant="outline-secondary" title={t('configPanel.section_hardware')} onClick={() => setOpenSection("hardware")}>
-          <i className="fa fa-microchip"></i>
-        </Button>
-        <Button variant="outline-secondary" title={t('configPanel.section_timers')} onClick={() => setOpenSection("timers")}>
-          <i className="fa fa-bell"></i>
-        </Button>
-        <Button variant="outline-secondary" title={t('configPanel.section_rules')} onClick={() => setOpenSection("rules")}>
-          <i className="fa fa-code"></i>
-        </Button>
+        ))}
       </ButtonGroup>
+
+      <Dropdown align="end" className="d-md-none ms-auto">
+        <Dropdown.Toggle variant="outline-secondary" size="sm" aria-label={t('configPanel.menu')}>
+          <i className="fa fa-bars"></i>
+        </Dropdown.Toggle>
+        <Dropdown.Menu>
+          {menuItems.map(item => (
+            <Dropdown.Item key={item.section} onClick={() => setOpenSection(item.section)}>
+              <i className={"fa fa-fw me-2 " + item.icon}></i>{sectionTitles[item.section]}
+            </Dropdown.Item>
+          ))}
+        </Dropdown.Menu>
+      </Dropdown>
 
       <Modal show={openSection !== null} onHide={() => setOpenSection(null)} size={(openSection === "timers" || openSection === "rules") ? "lg" : undefined}>
         <Modal.Header closeButton>

@@ -1,4 +1,4 @@
-import DeviceEvent from "./types/device";
+import DeviceEvent, { StorageTier } from "./types/device";
 import Login from "./types/login";
 import SensorEvent from "./types/sensor";
 import { CredentialResponse } from '@react-oauth/google';
@@ -158,11 +158,11 @@ export default class HttpApi {
         return this.get(`/api/devices/${deviceId}`);
     }
 
-    public async createDevice(data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean }): Promise<DeviceEvent> {
+    public async createDevice(data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean; storeChipTemp: boolean; offlineTimeout: number; storageTiers?: StorageTier[] }): Promise<DeviceEvent> {
         return new DeviceEvent(await this.sendJson('POST', '/api/devices', data));
     }
 
-    public async updateDevice(deviceId: number, data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean }): Promise<DeviceEvent> {
+    public async updateDevice(deviceId: number, data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean; storeChipTemp: boolean; offlineTimeout: number; storageTiers?: StorageTier[] }): Promise<DeviceEvent> {
         return new DeviceEvent(await this.sendJson('PUT', `/api/devices/${deviceId}`, data));
     }
 
@@ -198,6 +198,15 @@ export default class HttpApi {
         ledPwmMode: boolean | null;
         ledPwmOn: number | null;
         ledPwmOff: number | null;
+        /** has a status LED (Led/LedLink GPIO); true when the template couldn't be read */
+        statusLed: boolean;
+        /** "rgb" (WS2812 or 3+ PWM channels), "dimmer" (1-2 PWM channels) or null */
+        light: "rgb" | "dimmer" | null;
+        lightPower: boolean | null;
+        /** 0..100 */
+        dimmer: number | null;
+        /** "#rrggbb" at full brightness */
+        color: string | null;
     }> {
         return this.get(`/api/devices/${deviceId}/led`);
     }
@@ -205,12 +214,16 @@ export default class HttpApi {
     public getTiming(deviceId: number): Promise<{
         telePeriod: number | null;
         timezone: string | null;
+        uptimeSec: number | null;
+        offlineTimeout: number;
     }> {
         return this.get(`/api/devices/${deviceId}/timing`);
     }
 
     public getHardware(deviceId: number): Promise<{
         hardware: string | null;
+        chipTemperature: number | null;
+        loadAvg: number | null;
         firmware: {
             version: string | null;
             buildAt: string | null;
@@ -301,10 +314,5 @@ export default class HttpApi {
 
     public deleteNotification(deviceId: number, ruleId: number): Promise<void> {
         return this.send('DELETE', `/api/devices/${deviceId}/notifications/${ruleId}`);
-    }
-
-    /** 503: Telegram not configured on the server; 502: Telegram rejected the message (detail says why). */
-    public testNotification(): Promise<void> {
-        return this.send('POST', '/api/notifications/test');
     }
 }

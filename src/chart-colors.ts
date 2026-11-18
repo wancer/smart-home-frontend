@@ -6,5 +6,6 @@ export const CHART_COLORS: Record<string, ChartColor> = {
   temperature:   { border: "#f97316", background: "rgba(249,115,22,0.15)" },
   humidity:      { border: "#06b6d4", background: "rgba(6,182,212,0.1)" },
   co2:           { border: "#3b82f6", background: "rgba(59,130,246,0.15)" },
+  chip:          { border: "#a855f7", background: "rgba(168,85,247,0.15)" },
   online:        { border: "#22c55e", background: "rgba(34,197,94,0.25)" },
 };

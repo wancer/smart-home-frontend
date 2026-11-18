@@ -13,6 +13,8 @@ export default class SensorEvent {
     public temperature: number | null;
     public humidity: number | null;
 
+    public chipTemperature: number | null;
+
     constructor(decoded: any) {
         this.deviceId = decoded.deviceId;
         this.time = decoded.time;
@@ -24,5 +26,7 @@ export default class SensorEvent {
         this.co2 = decoded.co2;
         this.temperature = decoded.temperature;
         this.humidity = decoded.humidity;
+
+        this.chipTemperature = decoded.chipTemperature ?? null;
     }
 }

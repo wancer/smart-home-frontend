@@ -16,8 +16,11 @@
   "devicePage": {
     "sensor": "Sensor",
     "online": "Online",
+    "period_1h": "1h",
     "period_24h": "24h",
-    "period_30d": "30d"
+    "period_30d": "30d",
+    "chipTemperature": "Chip temperature",
+    "chipTemperatureChart": "Chip temperature, last 24h"
   },
   "devicesAdmin": {
     "title": "Devices",
@@ -57,7 +60,16 @@
     "form_sensorTH": "Temperature/Humidity",
     "form_sensorIr": "IR remote",
     "form_supportsToggle": "Supports power toggle",
-    "form_enabled": "Enabled"
+    "form_enabled": "Enabled",
+    "col_chipTemp": "Chip temp",
+    "form_storeChipTemp": "Store and show chip temperature",
+    "form_storeChipTempHelp": "ESP32 internal temperature (enable on the device with SetOption146 1). Kept for the last 24 hours and shown as a chart on the device page.",
+    "col_offlineTimeout": "Offline after",
+    "auto": "auto",
+    "form_offlineTimeout": "Offline timeout, seconds",
+    "form_offlineTimeoutHelp": "How long without telemetry before the device is marked offline. 0 = auto: two missed TelePeriods + 30 s, at least 1 minute. An LWT \"Offline\" marks it offline right away.",
+    "col_storage": "Storage",
+    "form_storage": "Sensor data storage"
   },
   "configPanel": {
     "menu": "Device settings",
@@ -83,6 +95,13 @@
     "pwmLedOnOff": "PWM LED on/off",
     "pwmIntensOn": "PWM intens ON",
     "pwmIntensOff": "PWM intens OFF",
+    "statusLed": "Status LED",
+    "noLed": "This device has no configurable LED.",
+    "lightRgb": "RGB light",
+    "lightDimmer": "Dimmable light",
+    "lightPower": "Light on/off",
+    "lightDimmer_value": "Brightness {{value}}%",
+    "lightColor": "Colour",
     "voltage": "Voltage",
     "power": "Power",
     "chip": "Chip",
@@ -130,7 +149,13 @@
     "day_3": "Wed",
     "day_4": "Thu",
     "day_5": "Fri",
-    "day_6": "Sat"
+    "day_6": "Sat",
+    "chipTemperature": "Chip temp",
+    "uptime": "Uptime",
+    "loadAvg": "Load avg",
+    "offlineTimeout": "Offline after",
+    "offlineTimeoutAuto": "auto, from TelePeriod",
+    "offlineTimeoutFixed": "set in device settings"
   },
   "ir": {
     "title": "Signals",
@@ -225,11 +250,6 @@
     "active": "Active",
     "activeHint": "Triggered, value hasn't recovered yet",
     "notifiesRecovery": "Also notifies when back to normal",
-    "test": "Send test message",
-    "testSent": "Test message sent",
-    "testNotConfigured": "Telegram isn't configured on the server",
-    "testRejected": "Telegram rejected the message",
-    "testFailed": "Failed to send test message",
     "notConfiguredPre": "Telegram isn't configured. Set",
     "and": "and",
     "notConfiguredPost": "on the server to receive notifications.",
@@ -290,5 +310,29 @@
     "loginFailed": "Sign-in failed (status {{status}}). Please try again.",
     "googleFailed": "Google sign-in failed.",
     "logout": "Log out"
+  },
+  "storageTiers": {
+    "raw": "every reading",
+    "minutes": "{{count}} min",
+    "hours": "{{count}} h",
+    "days": "{{count}} d",
+    "first": "Keep",
+    "then": "then",
+    "for": "for",
+    "step": "Bucket size",
+    "keep": "Keep for",
+    "keepUnit": "Unit",
+    "unit_h": "hours",
+    "unit_d": "days",
+    "forever": "forever",
+    "remove": "Remove tier",
+    "add": "Add tier",
+    "help": "Readings are stored in buckets of this size (with average, min and max) and kept for this long, then merged into the next tier's bigger buckets. Data older than the last tier is deleted. Applied hourly; a smaller first bucket only applies to new readings.",
+    "err_count": "Between 1 and 5 tiers.",
+    "err_forever": "Only the last tier can keep data forever.",
+    "err_keepShort": "A tier must be kept at least as long as its bucket size.",
+    "err_stepGrow": "Each tier's bucket must be bigger than the previous one.",
+    "err_stepMultiple": "Each tier's bucket must be a multiple of the previous one (e.g. 10 min → 15 min doesn't fit).",
+    "err_keepGrow": "Each tier must be kept longer than the previous one."
   }
 }

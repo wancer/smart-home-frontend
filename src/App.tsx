@@ -57,6 +57,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
         device.state.co2 = exact.co2;
         device.state.temperature = exact.temperature;
         device.state.humidity = exact.humidity;
+        device.state.chipTemperature = exact.chipTemperature;
 
         setLatestSensorEvent(exact);
 

@@ -6,6 +6,11 @@ class LedConfig {
     public ledPwmMode: boolean;
     public ledPwmOff: number;
     public ledPwmOn: number;
+    public statusLed: boolean;
+    public light: "rgb" | "dimmer" | null;
+    public lightPower: boolean | null;
+    public dimmer: number | null;
+    public color: string | null;
 
     constructor(decoded: any) {
         this.ledState = decoded.ledState;
@@ -13,6 +18,11 @@ class LedConfig {
         this.ledPwmMode = decoded.ledPwmMode;
         this.ledPwmOff = decoded.ledPwmOff;
         this.ledPwmOn = decoded.ledPwmOn;
+        this.statusLed = decoded.statusLed ?? true;
+        this.light = decoded.light ?? null;
+        this.lightPower = decoded.lightPower ?? null;
+        this.dimmer = decoded.dimmer ?? null;
+        this.color = decoded.color ?? null;
     }
 }
 

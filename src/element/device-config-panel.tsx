@@ -6,13 +6,17 @@ import DeviceEvent from "../api/types/device";
 import Timer from "../api/types/timer";
 import Rule from "../api/types/rule";
 import timezones from '../page/timezones';
+import NotificationRules from "./notification-rules";
 
 type Props = {
   api: HttpApi;
   device: DeviceEvent;
+  /** Chip temperature chart toggle (shown only for devices with storeChipTemp). */
+  chipChartOpen?: boolean;
+  onToggleChipChart?: () => void;
 };
 
-type Section = "power" | "timing" | "led" | "calibration" | "hardware" | "timers" | "rules" | null;
+type Section = "power" | "timing" | "led" | "calibration" | "hardware" | "timers" | "rules" | "notifications" | null;
 
 const delay = (ms: number) => new Promise(res => setTimeout(res, ms));
 
@@ -35,7 +39,7 @@ function SaveBtn({ disabled, onClick }: { disabled: boolean; onClick: () => void
   );
 }
 
-export default function DeviceConfigPanel({ api, device }: Props) {
+export default function DeviceConfigPanel({ api, device, chipChartOpen = false, onToggleChipChart }: Props) {
   const { t } = useTranslation();
   const [inProgress, setInProgress] = useState(false);
   const [openSection, setOpenSection] = useState<Section>(null);
@@ -52,6 +56,11 @@ export default function DeviceConfigPanel({ api, device }: Props) {
   const [ledPwmMode, setLedPwmMode] = useState(false);
   const [ledPwmOn, setLedPwmOn] = useState(-1);
   const [ledPwmOff, setLedPwmOff] = useState(-1);
+  const [statusLed, setStatusLed] = useState(true);
+  const [light, setLight] = useState<"rgb" | "dimmer" | null>(null);
+  const [lightPower, setLightPower] = useState(false);
+  const [dimmer, setDimmer] = useState(100);
+  const [color, setColor] = useState("#ffffff");
 
   const [firmwareVersion, setFirmwareVersion] = useState("");
   const [firmwareBuiltAt, setFirmwareBuiltAt] = useState("");
@@ -60,6 +69,12 @@ export default function DeviceConfigPanel({ api, device }: Props) {
   const [updateStarted, setUpdateStarted] = useState(false);
   const [updateMsg, setUpdateMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [hardwareChip, setHardwareChip] = useState<string | null>(null);
+  const [chipTemperature, setChipTemperature] = useState<number | null>(null);
+  const [loadAvg, setLoadAvg] = useState<number | null>(null);
+  // uptime as reported, and when it was received, so it can keep counting
+  const [uptimeBase, setUptimeBase] = useState<{ sec: number; at: number } | null>(null);
+  const [uptime, setUptime] = useState<number | null>(null);
+  const [offlineTimeout, setOfflineTimeout] = useState<number | null>(null);
 
   const [timingLoading, setTimingLoading] = useState(false);
   const [ledLoading, setLedLoading] = useState(false);
@@ -80,6 +95,9 @@ export default function DeviceConfigPanel({ api, device }: Props) {
       setLedPwmMode(config.led.ledPwmMode);
       setLedPwmOn(config.led.ledPwmOn);
       setLedPwmOff(config.led.ledPwmOff);
+      if (config.led.lightPower != null) setLightPower(config.led.lightPower);
+      if (config.led.dimmer != null) setDimmer(config.led.dimmer);
+      if (config.led.color != null) setColor(config.led.color);
       setFirmwareVersion(config.firmware.version);
       setFirmwareBuiltAt(config.firmware.buildAt);
       setHardwareChip(config.hardware);
@@ -97,6 +115,8 @@ export default function DeviceConfigPanel({ api, device }: Props) {
     api.getTiming(device.id).then(data => {
       if (data.telePeriod != null) setSensorsFreq(data.telePeriod);
       if (data.timezone != null) setTimezone(data.timezone);
+      setUptimeBase(data.uptimeSec != null ? { sec: data.uptimeSec, at: Date.now() } : null);
+      setOfflineTimeout(data.offlineTimeout ?? null);
       setTimingLoading(false);
     }).catch(() => setTimingLoading(false));
   }, [openSection]);
@@ -110,6 +130,11 @@ export default function DeviceConfigPanel({ api, device }: Props) {
       if (data.ledPwmMode != null) setLedPwmMode(data.ledPwmMode);
       if (data.ledPwmOn != null) setLedPwmOn(data.ledPwmOn);
       if (data.ledPwmOff != null) setLedPwmOff(data.ledPwmOff);
+      setStatusLed(data.statusLed ?? true);
+      setLight(data.light ?? null);
+      if (data.lightPower != null) setLightPower(data.lightPower);
+      if (data.dimmer != null) setDimmer(data.dimmer);
+      if (data.color != null) setColor(data.color);
       setLedLoading(false);
     }).catch(() => setLedLoading(false));
   }, [openSection]);
@@ -119,6 +144,8 @@ export default function DeviceConfigPanel({ api, device }: Props) {
     setHardwareLoading(true);
     api.getHardware(device.id).then(data => {
       setHardwareChip(data.hardware);
+      setChipTemperature(data.chipTemperature ?? null);
+      setLoadAvg(data.loadAvg ?? null);
       setFirmwareVersion(data.firmware.version ?? "");
       setFirmwareBuiltAt(data.firmware.buildAt ?? "");
       setLatestVersion(data.firmware.latestVersion ?? null);
@@ -176,6 +203,17 @@ export default function DeviceConfigPanel({ api, device }: Props) {
     return () => clearInterval(id);
   }, [openSection, device.state.deviceTime, device.state.last]);
 
+  useEffect(() => {
+    if (openSection !== "timing" || !uptimeBase) {
+      setUptime(null);
+      return;
+    }
+    const tick = () => setUptime(uptimeBase.sec + Math.floor((Date.now() - uptimeBase.at) / 1000));
+    tick();
+    const id = setInterval(tick, 1000);
+    return () => clearInterval(id);
+  }, [openSection, uptimeBase]);
+
   const run = async (action: () => Promise<void>) => {
     setInProgress(true);
     await action();
@@ -222,17 +260,23 @@ export default function DeviceConfigPanel({ api, device }: Props) {
     hardware: t('configPanel.section_hardware'),
     timers: t('configPanel.section_timers'),
     rules: t('configPanel.section_rules'),
+    notifications: t('notifications.title'),
   };
 
   const menuItems: { section: Exclude<Section, null>; icon: string }[] = [
     ...(device.supportsToggle ? [{ section: "power" as const, icon: "fa-power-off" }] : []),
     { section: "timing", icon: "fa-clock" },
     { section: "led", icon: "fa-lightbulb" },
-    ...(!device.isIrRemote() ? [{ section: "calibration" as const, icon: "fa-gauge" }] : []),
+    ...(device.isEnergySensor() ? [{ section: "calibration" as const, icon: "fa-gauge" }] : []),
     { section: "hardware", icon: "fa-microchip" },
-    { section: "timers", icon: "fa-bell" },
+    { section: "timers", icon: "fa-stopwatch" },
     { section: "rules", icon: "fa-code" },
+    { section: "notifications", icon: "fa-bell" },
   ];
+  // live value from WebSocket telemetry, falling back to the snapshot fetched when the popup opened
+  const chipTemp = device.state.chipTemperature ?? chipTemperature;
+  const showChipChart =device.storeChipTemp && onToggleChipChart != null;
+  const wideSection = openSection === "timers" || openSection === "rules" || openSection === "notifications";
 
   return (
     <>
@@ -242,6 +286,16 @@ export default function DeviceConfigPanel({ api, device }: Props) {
             <i className={"fa " + item.icon}></i>
           </Button>
         ))}
+        {showChipChart && (
+          <Button
+            variant={chipChartOpen ? "secondary" : "outline-secondary"}
+            active={chipChartOpen}
+            title={t('devicePage.chipTemperatureChart')}
+            onClick={onToggleChipChart}
+          >
+            <i className="fa fa-chart-line"></i>
+          </Button>
+        )}
       </ButtonGroup>
 
       <Dropdown align="end" className="d-md-none ms-auto">
@@ -254,10 +308,15 @@ export default function DeviceConfigPanel({ api, device }: Props) {
               <i className={"fa fa-fw me-2 " + item.icon}></i>{sectionTitles[item.section]}
             </Dropdown.Item>
           ))}
+          {showChipChart && (
+            <Dropdown.Item active={chipChartOpen} onClick={onToggleChipChart}>
+              <i className="fa fa-fw me-2 fa-chart-line"></i>{t('devicePage.chipTemperatureChart')}
+            </Dropdown.Item>
+          )}
         </Dropdown.Menu>
       </Dropdown>
 
-      <Modal show={openSection !== null} onHide={() => setOpenSection(null)} size={(openSection === "timers" || openSection === "rules") ? "lg" : undefined}>
+      <Modal show={openSection !== null} onHide={() => setOpenSection(null)} size={wideSection ? "lg" : undefined}>
         <Modal.Header closeButton>
           <Modal.Title>{openSection ? sectionTitles[openSection] : ""}</Modal.Title>
         </Modal.Header>
@@ -308,6 +367,25 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                   <SaveBtn disabled={inProgress} onClick={() => run(() => api.control(device.id, "tele-period", sensorsFreq.toString()))}/>
                 </Col>
               </Form.Group>
+              {offlineTimeout != null && (
+                <Form.Group as={Row} className="mb-3" controlId="cfgOfflineTimeout">
+                  <Form.Label column sm="3">{t('configPanel.offlineTimeout')}</Form.Label>
+                  <Col sm="9" className="d-flex align-items-center">
+                    {formatDuration(offlineTimeout)}
+                    <span className="text-muted small ms-2">
+                      ({device.offlineTimeout > 0 ? t('configPanel.offlineTimeoutFixed') : t('configPanel.offlineTimeoutAuto')})
+                    </span>
+                  </Col>
+                </Form.Group>
+              )}
+              {uptime != null && (
+                <Form.Group as={Row} className="mb-3" controlId="cfgUptime">
+                  <Form.Label column sm="3">{t('configPanel.uptime')}</Form.Label>
+                  <Col sm="9" className="d-flex align-items-center font-monospace">
+                    <i className="fa fa-hourglass-half me-2 text-secondary"></i>{formatDuration(uptime)}
+                  </Col>
+                </Form.Group>
+              )}
               </>
               )}
             </>
@@ -320,6 +398,45 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                 </div>
               ) : (
               <>
+              {light && (
+                <>
+                  <h6 className="text-muted">{t(light === "rgb" ? 'configPanel.lightRgb' : 'configPanel.lightDimmer')}</h6>
+                  <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLightPower">
+                    <Form.Label column sm="3">{t('configPanel.lightPower')}</Form.Label>
+                    <Col sm="7">
+                      <Form.Check type="switch" checked={lightPower} disabled={inProgress}
+                        onChange={() => {
+                          const next = !lightPower;
+                          setLightPower(next);
+                          run(() => api.control(device.id, "light-power", next ? "ON" : "OFF"));
+                        }}/>
+                    </Col>
+                  </Form.Group>
+                  <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLightDimmer">
+                    <Form.Label column sm="3">{t('configPanel.lightDimmer_value', { value: dimmer })}</Form.Label>
+                    <Col sm="7">
+                      <Form.Range value={dimmer} onChange={e => setDimmer(+e.target.value)} min={0} max={100}/>
+                    </Col>
+                    <Col sm="2">
+                      <SaveBtn disabled={inProgress} onClick={() => run(() => api.control(device.id, "light-dimmer", dimmer.toString()))}/>
+                    </Col>
+                  </Form.Group>
+                  {light === "rgb" && (
+                    <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLightColor">
+                      <Form.Label column sm="3">{t('configPanel.lightColor')}</Form.Label>
+                      <Col sm="7">
+                        <Form.Control type="color" value={color} onChange={e => setColor(e.target.value)} title={color}/>
+                      </Col>
+                      <Col sm="2">
+                        <SaveBtn disabled={inProgress} onClick={() => run(() => api.control(device.id, "light-color", color))}/>
+                      </Col>
+                    </Form.Group>
+                  )}
+                </>
+              )}
+              {statusLed && (
+                <>
+                  {light && <h6 className="text-muted">{t('configPanel.statusLed')}</h6>}
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLedOnOff">
                 <Form.Label column sm="3">{t('configPanel.ledOnOff')}</Form.Label>
                 <Col sm="7">
@@ -351,6 +468,8 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                   <SaveBtn disabled={inProgress} onClick={() => run(() => api.control(device.id, "led-pwm-mode", ledPwmMode ? "ON" : "OFF"))}/>
                 </Col>
               </Form.Group>
+              {ledPwmMode && (
+              <>
               <Form.Group as={Row} className="mb-3 align-items-center" controlId="cfgLedPwmOn">
                 <Form.Label column sm="3">{t('configPanel.pwmIntensOn')}</Form.Label>
                 <Col sm="7">
@@ -369,6 +488,13 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                   <SaveBtn disabled={inProgress} onClick={() => run(() => api.control(device.id, "led-pwm-off", ledPwmOff.toString()))}/>
                 </Col>
               </Form.Group>
+              </>
+              )}
+                </>
+              )}
+              {!statusLed && !light && (
+                <div className="text-muted">{t('configPanel.noLed')}</div>
+              )}
               </>
               )}
             </>
@@ -570,6 +696,9 @@ export default function DeviceConfigPanel({ api, device }: Props) {
               )}
             </>
           )}
+          {openSection === "notifications" && (
+            <NotificationRules key={"notif-" + device.id} api={api} device={device} />
+          )}
           {openSection === "hardware" && (
             <>
               {hardwareLoading ? (
@@ -583,6 +712,22 @@ export default function DeviceConfigPanel({ api, device }: Props) {
                     <Form.Label column sm="3">{t('configPanel.chip')}</Form.Label>
                     <Col sm="9" className="d-flex align-items-center">
                       <i className="fa fa-microchip me-2 text-secondary"></i>{hardwareChip}
+                    </Col>
+                  </Form.Group>
+                )}
+                {chipTemp != null && (
+                  <Form.Group as={Row} className="mb-3" controlId="cfgChipTemp">
+                    <Form.Label column sm="3">{t('configPanel.chipTemperature')}</Form.Label>
+                    <Col sm="9" className="d-flex align-items-center">
+                      <i className="fa fa-temperature-half me-2 text-secondary"></i>{chipTemp.toFixed(1)} °C
+                    </Col>
+                  </Form.Group>
+                )}
+                {loadAvg != null && (
+                  <Form.Group as={Row} className="mb-3" controlId="cfgLoadAvg">
+                    <Form.Label column sm="3">{t('configPanel.loadAvg')}</Form.Label>
+                    <Col sm="9" className="d-flex align-items-center">
+                      <i className="fa fa-gauge me-2 text-secondary"></i>{loadAvg} %
                     </Col>
                   </Form.Group>
                 )}
@@ -622,4 +767,16 @@ export default function DeviceConfigPanel({ api, device }: Props) {
       </Modal>
     </>
   );
+}
+
+/** 10208 -> "2h 50m 08s", 183600 -> "2d 3h 00m 00s" */
+function formatDuration(totalSec: number): string {
+  const d = Math.floor(totalSec / 86400);
+  const h = Math.floor(totalSec % 86400 / 3600);
+  const m = Math.floor(totalSec % 3600 / 60);
+  const s = totalSec % 60;
+  const pad = (n: number) => n.toString().padStart(2, "0");
+  if (d > 0) return `${d}d ${h}h ${pad(m)}m ${pad(s)}s`;
+  if (h > 0) return `${h}h ${pad(m)}m ${pad(s)}s`;
+  return `${m}m ${pad(s)}s`;
 }

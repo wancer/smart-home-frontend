@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Button, Form, InputGroup, Modal } from "react-bootstrap";
+import { Button, Form, InputGroup } from "react-bootstrap";
 import { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import HttpApi, { HttpError } from "../api/http";
@@ -74,7 +74,7 @@ const toInput = (r: NotificationRule): NotificationRuleInput => ({
   enabled: r.enabled,
 });
 
-// ---- section -------------------------------------------------------------
+// ---- section (rendered inside the device config panel's "notifications" popup) -------------------------------------------------------------
 
 // Mount with key={device.id} so state resets on device change.
 export default function NotificationRules({ api, device }: Props) {
@@ -85,7 +85,6 @@ export default function NotificationRules({ api, device }: Props) {
   const [data, setData] = useState<DeviceNotifications | undefined>(undefined);
   const [loadError, setLoadError] = useState(false);
   const [busy, setBusy] = useState<Set<number>>(new Set());
-  const [testing, setTesting] = useState(false);
   const [editor, setEditor] = useState<{ rule: NotificationRule | null } | null>(null);
 
   const fetchData = (isCancelled: () => boolean = () => false) =>
@@ -129,26 +128,6 @@ export default function NotificationRules({ api, device }: Props) {
     }
   };
 
-  const sendTest = async () => {
-    setTesting(true);
-    try {
-      await api.testNotification();
-      toast(t("notifications.testSent"), "success");
-    } catch (e) {
-      console.error((e as Error).message);
-      if (e instanceof HttpError && e.status === 503) {
-        setData(prev => prev && ({ ...prev, telegramConfigured: false }));
-        toast(t("notifications.testNotConfigured"), "danger");
-      } else if (e instanceof HttpError && e.status === 502) {
-        toast(describeError(e, t("notifications.testRejected")), "danger");
-      } else {
-        toast(t("notifications.testFailed"), "danger");
-      }
-    } finally {
-      setTesting(false);
-    }
-  };
-
   const onSaved = (rule: NotificationRule, created: boolean) => {
     setEditor(null);
     if (created) setData(prev => prev && ({ ...prev, rules: [...prev.rules, rule] }));
@@ -156,22 +135,22 @@ export default function NotificationRules({ api, device }: Props) {
   };
 
   return (
-    <div className="mt-4">
-      <div className="d-flex flex-wrap justify-content-between align-items-center my-3 gap-2">
-        <h4 className="m-0">
-          <i className="fa-solid fa-bell me-2"></i>{t("notifications.title")}
-        </h4>
-        <div className="d-flex gap-2">
-          <Button variant="outline-secondary" disabled={testing} onClick={sendTest}>
-            {testing
-              ? <span className="spinner-border spinner-border-sm me-1" role="status"></span>
-              : <i className="fa-solid fa-paper-plane me-1"></i>}
-            {t("notifications.test")}
-          </Button>
-          <Button variant="primary" disabled={!data} onClick={() => setEditor({ rule: null })}>
-            <i className="fa-solid fa-plus me-1"></i>{t("notifications.add")}
-          </Button>
-        </div>
+    <div>
+      {editor && data ? (
+        <RuleEditor
+          api={api}
+          deviceId={deviceId}
+          rule={editor.rule}
+          metrics={data.metrics}
+          onClose={() => setEditor(null)}
+          onSaved={onSaved}
+        />
+      ) : (
+      <>
+      <div className="d-flex justify-content-end mb-3">
+        <Button variant="primary" size="sm" disabled={!data} onClick={() => setEditor({ rule: null })}>
+          <i className="fa-solid fa-plus me-1"></i>{t("notifications.add")}
+        </Button>
       </div>
 
       {data && !data.telegramConfigured && (
@@ -241,16 +220,7 @@ export default function NotificationRules({ api, device }: Props) {
           </div>
         </div>
       ))}
-
-      {editor && data && (
-        <RuleEditor
-          api={api}
-          deviceId={deviceId}
-          rule={editor.rule}
-          metrics={data.metrics}
-          onClose={() => setEditor(null)}
-          onSaved={onSaved}
-        />
+      </>
       )}
       {toastNode}
     </div>
@@ -371,11 +341,9 @@ function RuleEditor({ api, deviceId, rule, metrics, onClose, onSaved }: EditorPr
   };
 
   return (
-    <Modal show onHide={onClose} fullscreen="sm-down" scrollable>
-      <Modal.Header closeButton>
-        <Modal.Title>{rule ? t("notifications.edit") : t("notifications.add")}</Modal.Title>
-      </Modal.Header>
-      <Modal.Body>
+    <div>
+      <h5 className="mb-3">{rule ? t("notifications.edit") : t("notifications.add")}</h5>
+      <div>
         {error && <div className="alert alert-danger" style={{ whiteSpace: "pre-wrap" }}>{error}</div>}
 
         {presets.length > 0 && (
@@ -486,13 +454,13 @@ function RuleEditor({ api, deviceId, rule, metrics, onClose, onSaved }: EditorPr
             })}
           </div>
         )}
-      </Modal.Body>
-      <Modal.Footer>
+      </div>
+      <div className="d-flex justify-content-end gap-2 mt-3 pt-3 border-top">
         <Button variant="secondary" onClick={onClose}>{t("notifications.cancel")}</Button>
         <Button variant="primary" onClick={save} disabled={!valid || saving}>
           {saving ? t("notifications.saving") : t("notifications.save")}
         </Button>
-      </Modal.Footer>
-    </Modal>
+      </div>
+    </div>
   );
 }

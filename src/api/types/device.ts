@@ -13,6 +13,8 @@ class DeviceState {
     public temperature: number;
     public humidity: number;
 
+    public chipTemperature: number | null;
+
     constructor(decoded: any) {
         this.on = decoded.on;
         this.last = decoded.last;
@@ -25,6 +27,8 @@ class DeviceState {
         this.co2 = decoded.co2;
         this.temperature = decoded.temperature;
         this.humidity = decoded.humidity;
+
+        this.chipTemperature = decoded.chipTemperature ?? null;
     }
 }
 
@@ -35,6 +39,12 @@ export type SensorHistory = {
     oldest: number | null;
 };
 
+/** Sensor data retention step: buckets of `step` seconds (0 = raw readings) kept for `keep` seconds (0 = forever). */
+export type StorageTier = {
+    step: number;
+    keep: number;
+};
+
 export default class DeviceEvent {
     public id: number;
     public name: string;
@@ -43,7 +53,11 @@ export default class DeviceEvent {
     public state: DeviceState;
     public sensorType: string;
     public supportsToggle: boolean;
+    public storeChipTemp: boolean;
+    /** Seconds without telemetry before the device is marked offline; 0 = auto (2×TelePeriod + 30 s). */
+    public offlineTimeout: number;
     public sensorHistory?: SensorHistory;
+    public storageTiers: StorageTier[];
 
     constructor(decoded: any) {
         this.id = decoded.id;
@@ -53,7 +67,15 @@ export default class DeviceEvent {
         this.state = new DeviceState(decoded.state)
         this.sensorType = decoded.sensorType;
         this.supportsToggle = decoded.supportsToggle;
+        this.storeChipTemp = decoded.storeChipTemp ?? false;
+        this.offlineTimeout = decoded.offlineTimeout ?? 0;
         this.sensorHistory = decoded.sensorHistory ?? undefined;
+        this.storageTiers = decoded.storageTiers ?? [{ step: 300, keep: 0 }];
+    }
+
+    /** Whether the newest data is stored as raw readings rather than buckets. */
+    public storesRaw(): boolean {
+        return this.storageTiers[0]?.step === 0;
     }
 
     public isEnergySensor(): boolean {

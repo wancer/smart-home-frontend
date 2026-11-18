@@ -3,8 +3,9 @@
 import { useState } from "react";
 import { Button, Table, Modal, Form, Badge } from "react-bootstrap";
 import { useTranslation } from "react-i18next";
-import DeviceEvent from "../api/types/device";
-import HttpApi from "../api/http";
+import DeviceEvent, { StorageTier } from "../api/types/device";
+import HttpApi, { HttpError } from "../api/http";
+import StorageTiersEditor, { DEFAULT_STORAGE_TIERS, formatTiers, validateTiers } from "../element/storage-tiers-editor";
 
 type DevicesAdminPageProperties = {
   api: HttpApi;
@@ -18,6 +19,9 @@ type DeviceFormData = {
   enabled: boolean;
   sensorType: string;
   supportsToggle: boolean;
+  storeChipTemp: boolean;
+  offlineTimeout: number;
+  storageTiers: StorageTier[];
 };
 
 const emptyForm: DeviceFormData = {
@@ -26,6 +30,9 @@ const emptyForm: DeviceFormData = {
   enabled: true,
   sensorType: "energy",
   supportsToggle: true,
+  storeChipTemp: false,
+  offlineTimeout: 0,
+  storageTiers: DEFAULT_STORAGE_TIERS,
 };
 
 export default function DevicesAdminPage({ api, devices, onDevicesChange }: DevicesAdminPageProperties) {
@@ -53,6 +60,9 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
       enabled: device.enabled,
       sensorType: device.sensorType,
       supportsToggle: device.supportsToggle,
+      storeChipTemp: device.storeChipTemp,
+      offlineTimeout: device.offlineTimeout,
+      storageTiers: device.storageTiers,
     });
     setError(null);
     setShowModal(true);
@@ -61,6 +71,11 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
   const handleSave = async () => {
     if (!form.name.trim() || !form.topic.trim()) {
       setError(t('devicesAdmin.nameTopicRequired'));
+      return;
+    }
+    const tiersError = validateTiers(form.storageTiers);
+    if (tiersError) {
+      setError(t(tiersError));
       return;
     }
     setSaving(true);
@@ -79,11 +94,14 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
         updated[editingId].enabled = updated_device.enabled;
         updated[editingId].sensorType = updated_device.sensorType;
         updated[editingId].supportsToggle = updated_device.supportsToggle;
+        updated[editingId].storeChipTemp = updated_device.storeChipTemp;
+        updated[editingId].offlineTimeout = updated_device.offlineTimeout;
+        updated[editingId].storageTiers = updated_device.storageTiers;
         onDevicesChange(updated);
       }
       setShowModal(false);
     } catch (e) {
-      setError((e as Error).message);
+      setError(e instanceof HttpError && e.detail ? e.detail : (e as Error).message);
     } finally {
       setSaving(false);
     }
@@ -142,6 +160,9 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
             <th>{t('devicesAdmin.col_topic')}</th>
             <th>{t('devicesAdmin.col_sensorType')}</th>
             <th>{t('devicesAdmin.col_toggle')}</th>
+            <th>{t('devicesAdmin.col_chipTemp')}</th>
+            <th>{t('devicesAdmin.col_offlineTimeout')}</th>
+            <th>{t('devicesAdmin.col_storage')}</th>
             <th>{t('devicesAdmin.col_enabled')}</th>
             <th>{t('devicesAdmin.col_history')}</th>
             <th></th>
@@ -155,6 +176,9 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
               <td><code>{device.topic}</code></td>
               <td>{device.sensorType}</td>
               <td>{device.supportsToggle ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="secondary">{t('devicesAdmin.no')}</Badge>}</td>
+              <td>{device.storeChipTemp ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="secondary">{t('devicesAdmin.no')}</Badge>}</td>
+              <td>{device.offlineTimeout > 0 ? `${device.offlineTimeout} s` : <span className="text-muted">{t('devicesAdmin.auto')}</span>}</td>
+              <td className="small text-nowrap">{formatTiers(t, device.storageTiers)}</td>
               <td>{device.enabled ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="danger">{t('devicesAdmin.no')}</Badge>}</td>
               <td className="small">
                 {device.sensorHistory ? (
@@ -187,7 +211,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
           ))}
           {deviceList.length === 0 && (
             <tr>
-              <td colSpan={8} className="text-center text-muted">{t('devicesAdmin.noDevices')}</td>
+              <td colSpan={11} className="text-center text-muted">{t('devicesAdmin.noDevices')}</td>
             </tr>
           )}
         </tbody>
@@ -209,7 +233,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
         </Modal.Footer>
       </Modal>
 
-      <Modal show={showModal} onHide={() => setShowModal(false)}>
+      <Modal show={showModal} onHide={() => setShowModal(false)} size="lg">
         <Modal.Header closeButton>
           <Modal.Title>{editingId === null ? t('devicesAdmin.addDevice') : t('devicesAdmin.editDevice')}</Modal.Title>
         </Modal.Header>
@@ -254,6 +278,37 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
                 checked={form.supportsToggle && form.sensorType !== "ir"}
                 disabled={form.sensorType === "ir"}
                 onChange={(e) => setForm({ ...form, supportsToggle: e.target.checked })}
+              />
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Check
+                type="switch"
+                label={t('devicesAdmin.form_storeChipTemp')}
+                checked={form.storeChipTemp}
+                onChange={(e) => setForm({ ...form, storeChipTemp: e.target.checked })}
+              />
+              <Form.Text className="text-muted">
+                {t('devicesAdmin.form_storeChipTempHelp')}
+              </Form.Text>
+            </Form.Group>
+            <Form.Group className="mb-3" controlId="deviceOfflineTimeout">
+              <Form.Label>{t('devicesAdmin.form_offlineTimeout')}</Form.Label>
+              <Form.Control
+                type="number"
+                min={0}
+                step={1}
+                value={form.offlineTimeout}
+                onChange={(e) => setForm({ ...form, offlineTimeout: Math.max(0, Math.floor(+e.target.value || 0)) })}
+              />
+              <Form.Text className="text-muted">
+                {t('devicesAdmin.form_offlineTimeoutHelp')}
+              </Form.Text>
+            </Form.Group>
+            <Form.Group className="mb-3">
+              <Form.Label>{t('devicesAdmin.form_storage')}</Form.Label>
+              <StorageTiersEditor
+                tiers={form.storageTiers}
+                onChange={(storageTiers) => setForm({ ...form, storageTiers })}
               />
             </Form.Group>
             <Form.Group className="mb-3">

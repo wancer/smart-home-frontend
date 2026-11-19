@@ -45,15 +45,59 @@ export type StorageTier = {
     keep: number;
 };
 
+/** Tasmota GPIO template, as read from the device. */
+export type DeviceTemplate = {
+    name: string;
+    gpio: number[];
+    flag: number;
+    base: number;
+};
+
+/** What the profile says the UI can offer; template-based values are 0/false/null while it's unknown. */
+export type DeviceFeatures = {
+    relays: number;
+    statusLed: boolean;
+    light: "rgb" | "dimmer" | null;
+    ir: boolean;
+    /** Energy meter: calibration. */
+    energy: boolean;
+    /** Reports the ESP32 internal temperature (SetOption146 1): stored for 24 h and charted. */
+    chipTemp: boolean;
+};
+
+/** Stored device profile (template, chip, firmware, sensors); refreshed when the device comes online or on demand. */
+export type DeviceProfile = {
+    template: DeviceTemplate | null;
+    chip: string | null;
+    firmwareVersion: string | null;
+    firmwareBuiltAt: string | null;
+    sensors: string[];
+    /** Unix time of the last profile change/refresh. */
+    profiledAt: number | null;
+    features: DeviceFeatures;
+};
+
+const emptyProfile: DeviceProfile = {
+    template: null,
+    chip: null,
+    firmwareVersion: null,
+    firmwareBuiltAt: null,
+    sensors: [],
+    profiledAt: null,
+    features: { relays: 0, statusLed: false, light: null, ir: false, energy: false, chipTemp: false },
+};
+
 export default class DeviceEvent {
     public id: number;
     public name: string;
     public topic: string;
     public enabled: boolean;
     public state: DeviceState;
+    /** Detected from the profile: energy, co2, t-h, ir or other. */
     public sensorType: string;
+    /** Has a relay (from the template) and isn't an IR remote. */
     public supportsToggle: boolean;
-    public storeChipTemp: boolean;
+    public profile: DeviceProfile;
     /** Seconds without telemetry before the device is marked offline; 0 = auto (2×TelePeriod + 30 s). */
     public offlineTimeout: number;
     public sensorHistory?: SensorHistory;
@@ -67,7 +111,7 @@ export default class DeviceEvent {
         this.state = new DeviceState(decoded.state)
         this.sensorType = decoded.sensorType;
         this.supportsToggle = decoded.supportsToggle;
-        this.storeChipTemp = decoded.storeChipTemp ?? false;
+        this.profile = decoded.profile ?? emptyProfile;
         this.offlineTimeout = decoded.offlineTimeout ?? 0;
         this.sensorHistory = decoded.sensorHistory ?? undefined;
         this.storageTiers = decoded.storageTiers ?? [{ step: 300, keep: 0 }];
@@ -92,5 +136,10 @@ export default class DeviceEvent {
 
     public isIrRemote(): boolean {
         return this.sensorType === 'ir';
+    }
+
+    /** Energy, CO₂ or T-H: has stored sensor data (not IR remotes or unrecognised devices). */
+    public hasSensorData(): boolean {
+        return this.isEnergySensor() || this.isCo2Sensor() || this.isThSensor();
     }
 }

@@ -158,12 +158,19 @@ export default class HttpApi {
         return this.get(`/api/devices/${deviceId}`);
     }
 
-    public async createDevice(data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean; storeChipTemp: boolean; offlineTimeout: number; storageTiers?: StorageTier[] }): Promise<DeviceEvent> {
+    public async createDevice(data: { name: string; topic: string; enabled: boolean; offlineTimeout: number; storageTiers?: StorageTier[] }): Promise<DeviceEvent> {
         return new DeviceEvent(await this.sendJson('POST', '/api/devices', data));
     }
 
-    public async updateDevice(deviceId: number, data: { name: string; topic: string; enabled: boolean; sensorType: string; supportsToggle: boolean; storeChipTemp: boolean; offlineTimeout: number; storageTiers?: StorageTier[] }): Promise<DeviceEvent> {
+    public async updateDevice(deviceId: number, data: { name: string; topic: string; enabled: boolean; offlineTimeout: number; storageTiers?: StorageTier[] }): Promise<DeviceEvent> {
         return new DeviceEvent(await this.sendJson('PUT', `/api/devices/${deviceId}`, data));
+    }
+
+    /** Re-reads template, chip/firmware and sensors from the device and re-detects its type. null if the device is offline (409). */
+    public async refreshProfile(deviceId: number): Promise<DeviceEvent | null> {
+        const raw = await this.call('POST', `/api/devices/${deviceId}/profile/refresh`, undefined,
+            async r => r.status === 409 ? null : r.json(), [409]);
+        return raw ? new DeviceEvent(raw) : null;
     }
 
     public deleteDevice(deviceId: number): Promise<void> {

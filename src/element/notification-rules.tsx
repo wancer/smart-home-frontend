@@ -22,6 +22,10 @@ import { useToasts } from "./use-toasts";
 type Props = { api: HttpApi; device: DeviceEvent };
 
 const usesThreshold = (k: NotificationKind) => THRESHOLD_KINDS.includes(k);
+// Kinds with a follow-up message: threshold kinds (back to normal) and offline (back online).
+const hasRecovery = (k: NotificationKind) => usesThreshold(k) || k === "offline";
+const recoveryKey = (k: NotificationKind, base: "notifyRecovery" | "notifiesRecovery") =>
+  `notifications.${base}${k === "offline" ? "Online" : ""}`;
 
 function describeError(e: unknown, fallback: string): string {
   if (e instanceof HttpError && e.detail.trim()) return e.detail.trim();
@@ -188,9 +192,9 @@ export default function NotificationRules({ api, device }: Props) {
                     </span>
                   )}
                 </div>
-                {usesThreshold(r.kind) && r.notifyRecovery && (
+                {hasRecovery(r.kind) && r.notifyRecovery && (
                   <div className="small text-muted">
-                    <i className="fa-solid fa-rotate-left me-1"></i>{t("notifications.notifiesRecovery")}
+                    <i className="fa-solid fa-rotate-left me-1"></i>{t(recoveryKey(r.kind, "notifiesRecovery"))}
                   </div>
                 )}
                 {r.message && (
@@ -232,7 +236,7 @@ export default function NotificationRules({ api, device }: Props) {
 type Preset = { key: string; input: Omit<NotificationRuleInput, "enabled" | "message"> };
 
 const PRESETS: Preset[] = [
-  { key: "presetOffline", input: { kind: "offline", metric: "", threshold: 0, duration: 300, notifyRecovery: false } },
+  { key: "presetOffline", input: { kind: "offline", metric: "", threshold: 0, duration: 300, notifyRecovery: true } },
   { key: "presetOnline", input: { kind: "online", metric: "", threshold: 0, duration: 0, notifyRecovery: false } },
   { key: "presetCo2", input: { kind: "above", metric: "co2", threshold: 1000, duration: 0, notifyRecovery: true } },
   { key: "presetHumidity", input: { kind: "above", metric: "humidity", threshold: 70, duration: 0, notifyRecovery: true } },
@@ -324,7 +328,7 @@ function RuleEditor({ api, deviceId, rule, metrics, onClose, onSaved }: EditorPr
       metric: threshold ? draft.metric : "",
       threshold: threshold ? (thr as number) : 0,
       duration: dur as number,
-      notifyRecovery: threshold && draft.notifyRecovery,
+      notifyRecovery: hasRecovery(draft.kind) && draft.notifyRecovery,
       message: draft.message.trim(),
       enabled: draft.enabled,
     };
@@ -415,12 +419,12 @@ function RuleEditor({ api, deviceId, rule, metrics, onClose, onSaved }: EditorPr
           <Form.Text>{t("notifications.durationHint")}</Form.Text>
         </Form.Group>
 
-        {threshold && (
+        {hasRecovery(draft.kind) && (
           <Form.Check
             className="mb-3"
             type="checkbox"
             id="notification-editor-recovery"
-            label={t("notifications.notifyRecovery")}
+            label={t(recoveryKey(draft.kind, "notifyRecovery"))}
             checked={draft.notifyRecovery}
             onChange={e => patch({ notifyRecovery: e.target.checked })}
           />

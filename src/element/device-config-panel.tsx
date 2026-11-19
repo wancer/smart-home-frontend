@@ -11,7 +11,7 @@ import NotificationRules from "./notification-rules";
 type Props = {
   api: HttpApi;
   device: DeviceEvent;
-  /** Chip temperature chart toggle (shown only for devices with storeChipTemp). */
+  /** Chip temperature chart toggle (shown only for devices reporting the ESP32 temperature). */
   chipChartOpen?: boolean;
   onToggleChipChart?: () => void;
 };
@@ -56,8 +56,10 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
   const [ledPwmMode, setLedPwmMode] = useState(false);
   const [ledPwmOn, setLedPwmOn] = useState(-1);
   const [ledPwmOff, setLedPwmOff] = useState(-1);
-  const [statusLed, setStatusLed] = useState(true);
-  const [light, setLight] = useState<"rgb" | "dimmer" | null>(null);
+  // from the stored template when known, so the LED popup shows the right sections right away
+  const templateKnown = device.profile.template != null;
+  const [statusLed, setStatusLed] = useState(templateKnown ? device.profile.features.statusLed : true);
+  const [light, setLight] = useState<"rgb" | "dimmer" | null>(device.profile.features.light);
   const [lightPower, setLightPower] = useState(false);
   const [dimmer, setDimmer] = useState(100);
   const [color, setColor] = useState("#ffffff");
@@ -68,7 +70,10 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateStarted, setUpdateStarted] = useState(false);
   const [updateMsg, setUpdateMsg] = useState<{ ok: boolean; text: string } | null>(null);
-  const [hardwareChip, setHardwareChip] = useState<string | null>(null);
+  const [hardwareChip, setHardwareChip] = useState<string | null>(device.profile.chip);
+  const [templateName, setTemplateName] = useState<string | null>(device.profile.template?.name ?? null);
+  const [profileRefreshing, setProfileRefreshing] = useState(false);
+  const [profileMsg, setProfileMsg] = useState<{ ok: boolean; text: string } | null>(null);
   const [chipTemperature, setChipTemperature] = useState<number | null>(null);
   const [loadAvg, setLoadAvg] = useState<number | null>(null);
   // uptime as reported, and when it was received, so it can keep counting
@@ -153,6 +158,31 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
       setHardwareLoading(false);
     }).catch(() => setHardwareLoading(false));
   }, [openSection]);
+
+  const refreshProfile = async () => {
+    setProfileRefreshing(true);
+    setProfileMsg(null);
+    try {
+      const refreshed = await api.refreshProfile(device.id);
+      if (refreshed === null) {
+        setProfileMsg({ ok: false, text: t('configPanel.refreshOffline') });
+        return;
+      }
+      setHardwareChip(refreshed.profile.chip);
+      setTemplateName(refreshed.profile.template?.name ?? null);
+      setFirmwareVersion(refreshed.profile.firmwareVersion ?? "");
+      setFirmwareBuiltAt(refreshed.profile.firmwareBuiltAt ?? "");
+      if (refreshed.sensorType !== device.sensorType) {
+        setProfileMsg({ ok: true, text: t('configPanel.refreshTypeChanged', { type: t('devicesAdmin.type_' + refreshed.sensorType, { defaultValue: refreshed.sensorType }) }) });
+      } else {
+        setProfileMsg({ ok: true, text: t('configPanel.refreshDone') });
+      }
+    } catch {
+      setProfileMsg({ ok: false, text: t('configPanel.refreshError') });
+    } finally {
+      setProfileRefreshing(false);
+    }
+  };
 
   const upgradeFirmware = async () => {
     if (!window.confirm(t('configPanel.updateConfirm'))) return;
@@ -266,7 +296,8 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
   const menuItems: { section: Exclude<Section, null>; icon: string }[] = [
     ...(device.supportsToggle ? [{ section: "power" as const, icon: "fa-power-off" }] : []),
     { section: "timing", icon: "fa-clock" },
-    { section: "led", icon: "fa-lightbulb" },
+    ...(!templateKnown || device.profile.features.statusLed || device.profile.features.light
+      ? [{ section: "led" as const, icon: "fa-lightbulb" }] : []),
     ...(device.isEnergySensor() ? [{ section: "calibration" as const, icon: "fa-gauge" }] : []),
     { section: "hardware", icon: "fa-microchip" },
     { section: "timers", icon: "fa-stopwatch" },
@@ -275,7 +306,7 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
   ];
   // live value from WebSocket telemetry, falling back to the snapshot fetched when the popup opened
   const chipTemp = device.state.chipTemperature ?? chipTemperature;
-  const showChipChart =device.storeChipTemp && onToggleChipChart != null;
+  const showChipChart = device.profile.features.chipTemp && onToggleChipChart != null;
   const wideSection = openSection === "timers" || openSection === "rules" || openSection === "notifications";
 
   return (
@@ -707,6 +738,12 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
                 </div>
               ) : (
               <Form>
+                {templateName && (
+                  <Form.Group as={Row} className="mb-3" controlId="cfgTemplate">
+                    <Form.Label column sm="3">{t('configPanel.template')}</Form.Label>
+                    <Col sm="9" className="d-flex align-items-center">{templateName}</Col>
+                  </Form.Group>
+                )}
                 {hardwareChip && (
                   <Form.Group as={Row} className="mb-3" controlId="cfgChip">
                     <Form.Label column sm="3">{t('configPanel.chip')}</Form.Label>
@@ -758,6 +795,17 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
                 <Form.Group as={Row} className="mb-3" controlId="cfgFwBuiltAt">
                   <Form.Label column sm="3">{t('configPanel.buildAt')}</Form.Label>
                   <Col sm="9" className="d-flex align-items-center">{firmwareBuiltAt}</Col>
+                </Form.Group>
+                <Form.Group as={Row} className="mb-3">
+                  <Col sm={{ span: 9, offset: 3 }}>
+                    <Button variant="outline-secondary" size="sm" disabled={profileRefreshing} onClick={refreshProfile}
+                      title={t('devicesAdmin.refreshProfile')}>
+                      <i className={"fa fa-rotate me-2" + (profileRefreshing ? " fa-spin" : "")}></i>{t('configPanel.refreshProfile')}
+                    </Button>
+                    {profileMsg && (
+                      <div className={"mt-2 small " + (profileMsg.ok ? "text-success" : "text-danger")}>{profileMsg.text}</div>
+                    )}
+                  </Col>
                 </Form.Group>
               </Form>
               )}

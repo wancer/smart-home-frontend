@@ -17,9 +17,6 @@ type DeviceFormData = {
   name: string;
   topic: string;
   enabled: boolean;
-  sensorType: string;
-  supportsToggle: boolean;
-  storeChipTemp: boolean;
   offlineTimeout: number;
   storageTiers: StorageTier[];
 };
@@ -28,9 +25,6 @@ const emptyForm: DeviceFormData = {
   name: "",
   topic: "",
   enabled: true,
-  sensorType: "energy",
-  supportsToggle: true,
-  storeChipTemp: false,
   offlineTimeout: 0,
   storageTiers: DEFAULT_STORAGE_TIERS,
 };
@@ -44,6 +38,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
   const [error, setError] = useState<string | null>(null);
   const [wipeTarget, setWipeTarget] = useState<DeviceEvent | null>(null);
   const [wiping, setWiping] = useState(false);
+  const [refreshingId, setRefreshingId] = useState<number | null>(null);
 
   const openCreate = () => {
     setEditingId(null);
@@ -58,9 +53,6 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
       name: device.name,
       topic: device.topic,
       enabled: device.enabled,
-      sensorType: device.sensorType,
-      supportsToggle: device.supportsToggle,
-      storeChipTemp: device.storeChipTemp,
       offlineTimeout: device.offlineTimeout,
       storageTiers: device.storageTiers,
     });
@@ -92,9 +84,6 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
         updated[editingId].name = updated_device.name;
         updated[editingId].topic = updated_device.topic;
         updated[editingId].enabled = updated_device.enabled;
-        updated[editingId].sensorType = updated_device.sensorType;
-        updated[editingId].supportsToggle = updated_device.supportsToggle;
-        updated[editingId].storeChipTemp = updated_device.storeChipTemp;
         updated[editingId].offlineTimeout = updated_device.offlineTimeout;
         updated[editingId].storageTiers = updated_device.storageTiers;
         onDevicesChange(updated);
@@ -129,6 +118,27 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
     }
   };
 
+  const handleRefresh = async (device: DeviceEvent) => {
+    setRefreshingId(device.id);
+    try {
+      const refreshed = await api.refreshProfile(device.id);
+      if (refreshed === null) {
+        alert(t('devicesAdmin.refreshOffline', { name: device.name }));
+        return;
+      }
+      // keep the list-only data (sensor history) and the live state
+      refreshed.sensorHistory = device.sensorHistory;
+      refreshed.state = device.state;
+      const updated = { ...devices } as unknown as Record<number, DeviceEvent>;
+      updated[device.id] = refreshed;
+      onDevicesChange(updated as unknown as DeviceEvent[]);
+    } catch (e) {
+      alert((e as Error).message);
+    } finally {
+      setRefreshingId(null);
+    }
+  };
+
   const handleDelete = async (device: DeviceEvent) => {
     if (!confirm(t('devicesAdmin.deleteConfirm', { name: device.name }))) return;
     try {
@@ -159,8 +169,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
             <th>{t('devicesAdmin.col_name')}</th>
             <th>{t('devicesAdmin.col_topic')}</th>
             <th>{t('devicesAdmin.col_sensorType')}</th>
-            <th>{t('devicesAdmin.col_toggle')}</th>
-            <th>{t('devicesAdmin.col_chipTemp')}</th>
+            <th>{t('devicesAdmin.col_hardware')}</th>
             <th>{t('devicesAdmin.col_offlineTimeout')}</th>
             <th>{t('devicesAdmin.col_storage')}</th>
             <th>{t('devicesAdmin.col_enabled')}</th>
@@ -174,9 +183,18 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
               <td>{device.id}</td>
               <td>{device.name}</td>
               <td><code>{device.topic}</code></td>
-              <td>{device.sensorType}</td>
-              <td>{device.supportsToggle ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="secondary">{t('devicesAdmin.no')}</Badge>}</td>
-              <td>{device.storeChipTemp ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="secondary">{t('devicesAdmin.no')}</Badge>}</td>
+              <td>
+                {t('devicesAdmin.type_' + device.sensorType, { defaultValue: device.sensorType })}
+                {device.profile.sensors.length > 0 && (
+                  <div className="small text-muted">{device.profile.sensors.join(", ")}</div>
+                )}
+              </td>
+              <td className="small">
+                {device.profile.template?.name && <div>{device.profile.template.name}</div>}
+                {device.profile.chip && <div className="text-muted"><i className="fa fa-microchip me-1"></i>{device.profile.chip}</div>}
+                {device.profile.firmwareVersion && <div className="text-muted">{device.profile.firmwareVersion}</div>}
+                {device.profile.profiledAt == null && <span className="text-muted">{t('devicesAdmin.profileUnknown')}</span>}
+              </td>
               <td>{device.offlineTimeout > 0 ? `${device.offlineTimeout} s` : <span className="text-muted">{t('devicesAdmin.auto')}</span>}</td>
               <td className="small text-nowrap">{formatTiers(t, device.storageTiers)}</td>
               <td>{device.enabled ? <Badge bg="success">{t('devicesAdmin.yes')}</Badge> : <Badge bg="danger">{t('devicesAdmin.no')}</Badge>}</td>
@@ -197,6 +215,10 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
                 )}
               </td>
               <td>
+                <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => handleRefresh(device)}
+                  disabled={refreshingId === device.id} title={t('devicesAdmin.refreshProfile')}>
+                  <i className={"fa-solid fa-rotate" + (refreshingId === device.id ? " fa-spin" : "")}></i>
+                </Button>
                 <Button variant="outline-secondary" size="sm" className="me-2" onClick={() => openEdit(device)}>
                   <i className="fa-solid fa-pen"></i>
                 </Button>
@@ -211,7 +233,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
           ))}
           {deviceList.length === 0 && (
             <tr>
-              <td colSpan={11} className="text-center text-muted">{t('devicesAdmin.noDevices')}</td>
+              <td colSpan={10} className="text-center text-muted">{t('devicesAdmin.noDevices')}</td>
             </tr>
           )}
         </tbody>
@@ -259,38 +281,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
                 {t('devicesAdmin.form_topicHelp')}
               </Form.Text>
             </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Label>{t('devicesAdmin.form_sensorType')}</Form.Label>
-              <Form.Select
-                value={form.sensorType}
-                onChange={(e) => setForm({ ...form, sensorType: e.target.value, supportsToggle: e.target.value === "ir" ? false : form.supportsToggle })}
-              >
-                <option value="energy">{t('devicesAdmin.form_sensorEnergy')}</option>
-                <option value="co2">{t('devicesAdmin.form_sensorCo2')}</option>
-                <option value="t-h">{t('devicesAdmin.form_sensorTH')}</option>
-                <option value="ir">{t('devicesAdmin.form_sensorIr')}</option>
-              </Form.Select>
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Check
-                type="switch"
-                label={t('devicesAdmin.form_supportsToggle')}
-                checked={form.supportsToggle && form.sensorType !== "ir"}
-                disabled={form.sensorType === "ir"}
-                onChange={(e) => setForm({ ...form, supportsToggle: e.target.checked })}
-              />
-            </Form.Group>
-            <Form.Group className="mb-3">
-              <Form.Check
-                type="switch"
-                label={t('devicesAdmin.form_storeChipTemp')}
-                checked={form.storeChipTemp}
-                onChange={(e) => setForm({ ...form, storeChipTemp: e.target.checked })}
-              />
-              <Form.Text className="text-muted">
-                {t('devicesAdmin.form_storeChipTempHelp')}
-              </Form.Text>
-            </Form.Group>
+            <div className="text-muted small mb-3">{t('devicesAdmin.form_detectedHelp')}</div>
             <Form.Group className="mb-3" controlId="deviceOfflineTimeout">
               <Form.Label>{t('devicesAdmin.form_offlineTimeout')}</Form.Label>
               <Form.Control

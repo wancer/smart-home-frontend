@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
-import { Col } from "react-bootstrap";
+import { Button, ButtonGroup, Col } from "react-bootstrap";
 import DeviceConfigPanel from "../element/device-config-panel.tsx";
-import { Bar, Line } from "react-chartjs-2";
+import { Line } from "react-chartjs-2";
 import {
   Chart as ChartJS,
   LineController,
@@ -39,12 +39,13 @@ ChartJS.register(
 import DeviceEvent from "../api/types/device.ts";
 import { CHART_COLORS } from "../chart-colors.ts";
 import HttpApi from "../api/http.ts";
-import SensorDailyEvent from "../api/types/sensor-daily.ts";
 import SensorEventStat from "../api/types/sensor-event-stat.ts";
 import { SensorEvent } from "../api/types/ws-event.ts";
 import PowerIcon from "../element/power-icon.tsx";
 import IrPanel from "../element/ir-panel.tsx";
 import ChipTemperature from "../element/chip-temperature.tsx";
+import { formatDuration } from "../element/storage-tiers-editor.tsx";
+import { ChartPeriod, chartLabels, chartPeriods, defaultPeriodIndex, pageEnd, pageLabel } from "../chart-periods.ts";
 
 type DevicePageProperties = {
   api: HttpApi;
@@ -156,14 +157,6 @@ function withGaps(events: SensorEventStat[]): SensorEventStat[] {
   return result;
 }
 
-// chartLabels shows seconds only for raw readings, which aren't on whole minutes.
-function chartLabels(events: SensorEventStat[]): string[] {
-  const seconds = events.some(r => r.time % 60 !== 0);
-  return events.map(r => new Date(r.time * 1000).toLocaleTimeString([], seconds
-    ? { hour: "2-digit", minute: "2-digit", second: "2-digit" }
-    : { hour: "2-digit", minute: "2-digit" }));
-}
-
 type ChartColor = { border: string; background: string };
 
 // bandDatasets draws the min-max range as a filled band (max fills down to min). They must
@@ -195,31 +188,8 @@ const xAxisConfig = {
   },
 };
 
-type Period = "1h" | "24h" | "30d";
-type LivePeriod = Exclude<Period, "30d">;
-
-// What the 1h/24h charts request: [duration, step, step seconds (0 = raw), window seconds].
-// 1h shows every reading for devices that store raw data, 1-minute steps otherwise.
-function chartRange(p: LivePeriod, device: DeviceEvent): [string, string, number, number] {
-  if (p === "1h") return device.storesRaw() ? ["1h", "raw", 0, 3600] : ["1h", "1m", 60, 3600];
-  return ["24h", "5m", 300, 86400];
-}
 type Co2Chart = "co2" | "th";
 type ChartMode = "sensor" | "online";
-
-function todayStr(): string {
-  const d = new Date();
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, "0");
-  const day = String(d.getDate()).padStart(2, "0");
-  return `${y}-${m}-${day}`;
-}
-
-function dateToTill(dateStr: string): number | undefined {
-  if (dateStr === todayStr()) return undefined;
-  const [y, mo, d] = dateStr.split("-").map(Number);
-  return Math.floor(new Date(y, mo - 1, d + 1).getTime() / 1000);
-}
 
 function ButtonSelector<T extends string>({ options, labels, current, onChange }: { options: T[]; labels?: string[]; current: T; onChange: (v: T) => void }) {
   return (
@@ -244,68 +214,87 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
 
   let device = devices[deviceId];
 
-  const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[] | undefined>(undefined);
+  const periods = chartPeriods(device);
+  const [periodIndex, setPeriodIndex] = useState(() => defaultPeriodIndex(periods));
+  const period = periods[Math.min(periodIndex, periods.length - 1)];
+  // offset counts pages back from now: 0 is the live page, 1 the previous whole hour/day/…
+  const [offset, setOffset] = useState(0);
   const [events, setEvents] = useState<SensorEventStat[] | undefined>(undefined);
-  const [period, setPeriod] = useState<Period>("24h");
   const [co2Chart, setCo2Chart] = useState<Co2Chart>("co2");
   const [chartMode, setChartMode] = useState<ChartMode>("sensor");
-  const [selectedDate, setSelectedDate] = useState<string>(todayStr());
   const [chipChartOpen, setChipChartOpen] = useState(false);
   const counts = useRef<Record<number, number>>({});
-  const chartEvents = events !== undefined && period === "1h" && device.storesRaw() ? withGaps(events) : events;
+  const chartEvents = events !== undefined && period.step === 0 ? withGaps(events) : events;
   const loadId = useRef(0);
 
-  // loadEvents fetches the 1h/24h chart; a slower earlier request can't overwrite it.
-  function loadEvents(p: LivePeriod, date: string) {
+  // loadEvents fetches the chart; a slower earlier request can't overwrite it.
+  function loadEvents(p: ChartPeriod, pageOffset: number) {
     const id = ++loadId.current;
     setEvents(undefined);
     counts.current = {};
-    const [duration, scale] = chartRange(p, device);
-    const till = p === "24h" ? dateToTill(date) : undefined;
-    api.sensorsConfigurable(deviceId, duration, scale, till).then(loaded => {
+    const scale = p.step === 0 ? "raw" : `${p.step}s`;
+    api.sensorsConfigurable(deviceId, `${p.window}s`, scale, pageEnd(p.window, pageOffset)).then(loaded => {
       if (id === loadId.current) setEvents(loaded);
     });
   }
 
   useEffect(() => {
-    setEventsMonthly(undefined);
-    setPeriod("24h");
+    const index = defaultPeriodIndex(periods);
+    setPeriodIndex(index);
+    setOffset(0);
     setCo2Chart("co2");
     setChartMode("sensor");
-    setSelectedDate(todayStr());
     setChipChartOpen(false);
 
     if (device.isIrRemote()) {
       setEvents(undefined);
     } else {
-      loadEvents("24h", todayStr());
+      loadEvents(periods[index], 0);
     }
   }, [deviceId]);
 
   useEffect(() => {
-    if (!latestSensorEvent || latestSensorEvent.deviceId !== deviceId) return;
-    if (period === "30d" || (period === "24h" && selectedDate !== todayStr())) return;
+    if (!latestSensorEvent || latestSensorEvent.deviceId !== deviceId || offset !== 0) return;
     const e = latestSensorEvent;
-    const [, , requestedStep, windowSeconds] = chartRange(period, device);
-    setEvents(prev => prev ? upsertBucket(prev, e, chartStep(prev, requestedStep), windowSeconds, counts.current, device) : prev);
+    setEvents(prev => prev ? upsertBucket(prev, e, chartStep(prev, period.step), period.window, counts.current, device) : prev);
   }, [latestSensorEvent]);
 
-
-  function changePeriod(newPeriod: Period) {
-    if (newPeriod === period) return;
-    setPeriod(newPeriod);
-    if (newPeriod === "30d") {
-      setChartMode("sensor");
-      if (eventsMonthly === undefined) api.sensorsDaily(deviceId).then(setEventsMonthly);
-    } else {
-      loadEvents(newPeriod, selectedDate);
-    }
+  function changePeriod(index: number) {
+    if (index === periodIndex) return;
+    setPeriodIndex(index);
+    setOffset(0);
+    loadEvents(periods[index], 0);
   }
 
-  function handleDateChange(newDate: string) {
-    setSelectedDate(newDate);
-    loadEvents("24h", newDate);
+  function changeOffset(newOffset: number) {
+    setOffset(newOffset);
+    loadEvents(period, newOffset);
   }
+
+  const oldest = device.sensorHistory?.oldest;
+  const prevEnd = pageEnd(period.window, offset + 1)!;
+  const currentEnd = pageEnd(period.window, offset);
+  const periodControls = (
+    <>
+      <ButtonSelector
+        options={periods.map((_, i) => String(i))}
+        labels={periods.map(p => formatDuration(t, p.window))}
+        current={String(Math.min(periodIndex, periods.length - 1))}
+        onChange={(v) => changePeriod(+v)}
+      />
+      <ButtonGroup size="sm" className="mb-3">
+        <Button variant="outline-secondary" onClick={() => changeOffset(offset + 1)} disabled={oldest != null && prevEnd <= oldest} aria-label={t("devicePage.earlier")}>
+          <i className="fa fa-chevron-left" />
+        </Button>
+        <Button variant="outline-secondary" disabled className="text-nowrap">
+          {currentEnd === undefined ? t("devicePage.latest") : pageLabel(period.window, currentEnd)}
+        </Button>
+        <Button variant="outline-secondary" onClick={() => changeOffset(offset - 1)} disabled={offset === 0} aria-label={t("devicePage.later")}>
+          <i className="fa fa-chevron-right" />
+        </Button>
+      </ButtonGroup>
+    </>
+  );
 
   return (
     <>
@@ -322,7 +311,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
         </h2>
       </div>
 
-      { device.storeChipTemp && chipChartOpen && <ChipTemperature key={"chip-" + device.id} api={api} device={device} latestSensorEvent={latestSensorEvent} /> }
+      { device.profile.features.chipTemp && chipChartOpen && <ChipTemperature key={"chip-" + device.id} api={api} device={device} latestSensorEvent={latestSensorEvent} /> }
 
       { device.isIrRemote() && <IrPanel key={"ir-" + device.id} api={api} device={device} devices={devices} /> }
 
@@ -349,14 +338,12 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
           </div>
 
           <div className="row">
-            <div className="d-flex gap-2 align-items-center">
-              <ButtonSelector options={["1h", "24h", "30d"] as Period[]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h"), t("devicePage.period_30d")]} current={period} onChange={changePeriod} />
-              {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
-              {period !== "30d" && <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />}
+            <div className="d-flex flex-wrap column-gap-2 align-items-center">
+              {periodControls}
+              <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
             </div>
-            {period !== "30d" && chartMode === "sensor" && (chartEvents === undefined ? <ChartSpinner /> : <ChartPower events={chartEvents} />)}
-            {period === "30d"                           && (eventsMonthly === undefined ? <ChartSpinner /> : <ChartDailyConsumption dailyEvents={eventsMonthly} />)}
-            {period !== "30d" && chartMode === "online" && (chartEvents === undefined ? <ChartSpinner /> : <ChartOnline events={chartEvents} />)}
+            {chartMode === "sensor" && (chartEvents === undefined ? <ChartSpinner /> : <ChartPower events={chartEvents} window={period.window} />)}
+            {chartMode === "online" && (chartEvents === undefined ? <ChartSpinner /> : <ChartOnline events={chartEvents} window={period.window} />)}
           </div>
         </>
       ) }
@@ -384,15 +371,14 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
           </div>
 
           <div className="row">
-            <div className="d-flex gap-2 align-items-center">
-              <ButtonSelector options={["1h", "24h"] as Period[]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
-              {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
+            <div className="d-flex flex-wrap column-gap-2 align-items-center">
+              {periodControls}
               {chartMode === "sensor" && <ButtonSelector options={["co2", "th"]} labels={["CO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />}
               <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
             </div>
-            {period !== "30d" && chartMode === "sensor" && co2Chart === "co2"  && (chartEvents === undefined ? <ChartSpinner /> : <ChartCo2  events={chartEvents} />)}
-            {period !== "30d" && chartMode === "sensor" && co2Chart === "th"   && (chartEvents === undefined ? <ChartSpinner /> : <ChartTH   events={chartEvents} />)}
-            {period !== "30d" && chartMode === "online"                        && (chartEvents === undefined ? <ChartSpinner /> : <ChartOnline events={chartEvents} />)}
+            {chartMode === "sensor" && co2Chart === "co2" && (chartEvents === undefined ? <ChartSpinner /> : <ChartCo2    events={chartEvents} window={period.window} />)}
+            {chartMode === "sensor" && co2Chart === "th"  && (chartEvents === undefined ? <ChartSpinner /> : <ChartTH     events={chartEvents} window={period.window} />)}
+            {chartMode === "online"                       && (chartEvents === undefined ? <ChartSpinner /> : <ChartOnline events={chartEvents} window={period.window} />)}
           </div>
         </>
       ) }
@@ -415,13 +401,12 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
           </div>
 
           <div className="row">
-            <div className="d-flex gap-2 align-items-center">
-              <ButtonSelector options={["1h", "24h"] as Period[]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
-              {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
+            <div className="d-flex flex-wrap column-gap-2 align-items-center">
+              {periodControls}
               <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
             </div>
-            {period !== "30d" && chartMode === "sensor" && (chartEvents === undefined ? <ChartSpinner /> : <ChartTH events={chartEvents} />)}
-            {period !== "30d" && chartMode === "online" && (chartEvents === undefined ? <ChartSpinner /> : <ChartOnline events={chartEvents} />)}
+            {chartMode === "sensor" && (chartEvents === undefined ? <ChartSpinner /> : <ChartTH     events={chartEvents} window={period.window} />)}
+            {chartMode === "online" && (chartEvents === undefined ? <ChartSpinner /> : <ChartOnline events={chartEvents} window={period.window} />)}
           </div>
         </>
       ) }
@@ -439,43 +424,11 @@ function ChartSpinner() {
   );
 }
 
-type DailyChartProperties = {
-  dailyEvents: SensorDailyEvent[];
-};
+type ChartProperties = { events: SensorEventStat[]; window: number };
 
-function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
+function ChartPower({ events, window }: ChartProperties) {
   const data = {
-    labels: dailyEvents.map((e) => e.date),
-    datasets: [
-      {
-        label: "kWh",
-        borderColor: CHART_COLORS.powerConsumed.border,
-        backgroundColor: CHART_COLORS.powerConsumed.background,
-        data: dailyEvents.map((e) => e.power != null ? +e.power.toFixed(3) : null),
-      },
-    ],
-  };
-  const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    plugins: {
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
-    scales: {
-      x: xAxisConfig,
-      y: {
-        min: 0,
-        title: { display: true, text: "kWh" },
-      },
-    },
-  };
-
-  return <Bar data={data} options={options} />;
-}
-
-function ChartPower({ events }: { events: SensorEventStat[] }) {
-  const data = {
-    labels: chartLabels(events),
+    labels: chartLabels(events.map(r => r.time), window),
     datasets: [
       {
         label: "W",
@@ -512,9 +465,9 @@ function ChartPower({ events }: { events: SensorEventStat[] }) {
   return <Line data={data} options={options} />;
 }
 
-function ChartCo2({ events }: { events: SensorEventStat[] }) {
+function ChartCo2({ events, window }: ChartProperties) {
   const data = {
-    labels: chartLabels(events),
+    labels: chartLabels(events.map(r => r.time), window),
     datasets: [
       {
         label: "CO₂ ppm",
@@ -548,9 +501,9 @@ function ChartCo2({ events }: { events: SensorEventStat[] }) {
   return <Line data={data} options={options} />;
 }
 
-function ChartOnline({ events }: { events: SensorEventStat[] }) {
+function ChartOnline({ events, window }: ChartProperties) {
   const data = {
-    labels: chartLabels(events),
+    labels: chartLabels(events.map(r => r.time), window),
     datasets: [
       {
         label: "Online",
@@ -586,9 +539,9 @@ function ChartOnline({ events }: { events: SensorEventStat[] }) {
   return <Line data={data} options={options} />;
 }
 
-function ChartTH({ events }: { events: SensorEventStat[] }) {
+function ChartTH({ events, window }: ChartProperties) {
   const data = {
-    labels: chartLabels(events),
+    labels: chartLabels(events.map(r => r.time), window),
     datasets: [
       {
         label: "°C",

@@ -368,8 +368,13 @@ function ChartMetrics({ events, window, metrics }: ChartProperties & { metrics: 
   const axisIds = ["y", "y1"];
 
   const datasets = shown.flatMap((m, i) => {
-    const min = series(m, "Min");
-    const max = series(m, "Max");
+    // A point whose min equals its max (a raw reading, or a bucket with one reading) has no
+    // range: drop it from the band so it isn't drawn or listed in the tooltip.
+    const rawMin = series(m, "Min");
+    const rawMax = series(m, "Max");
+    const flat = rawMin.map((v, j) => v == null || rawMax[j] == null || v === rawMax[j]);
+    const min = rawMin.map((v, j) => flat[j] ? null : v);
+    const max = rawMax.map((v, j) => flat[j] ? null : v);
     const hasBand = min.some(v => v != null) && max.some(v => v != null);
     return [
       {

@@ -1,9 +1,8 @@
-"use client";
-
 import { Button, Form, InputGroup } from "react-bootstrap";
 import { useTranslation } from "react-i18next";
 import { TFunction } from "i18next";
 import { StorageTier } from "../api/types/device";
+import { formatDuration } from "../format";
 
 // Mirrors model.StorageSteps in the backend: seconds, 0 = raw readings.
 export const STORAGE_STEPS = [0, 60, 300, 600, 900, 1800, 3600, 86400];
@@ -20,12 +19,6 @@ function keepUnit(keep: number): KeepUnit {
 }
 
 /** "5 min", "1 h", "1 d", or "raw" for step 0. */
-export function formatDuration(t: TFunction, seconds: number): string {
-  if (seconds % DAY === 0) return t("storageTiers.days", { count: seconds / DAY });
-  if (seconds % HOUR === 0) return t("storageTiers.hours", { count: seconds / HOUR });
-  return t("storageTiers.minutes", { count: Math.round(seconds / 60) });
-}
-
 export function formatStep(t: TFunction, step: number): string {
   return step === 0 ? t("storageTiers.raw") : formatDuration(t, step);
 }

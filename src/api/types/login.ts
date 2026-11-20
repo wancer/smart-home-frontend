@@ -1,5 +1,3 @@
-'use client';
-
 export default class Login {
     public token: string;
     

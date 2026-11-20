@@ -1,5 +1,3 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { SensorEvent, StateEvent } from "./api/types/ws-event.ts";
@@ -44,7 +42,6 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
       const parsed = JSON.parse(lastMessage.data);
 
       if (parsed.channel === 'sensor') {
-        console.log('sensor', parsed)
         const exact = new SensorEvent(parsed.body);
         const device = devices[exact.deviceId];
         // Events can arrive before the device list has loaded, or for a device we don't know about.
@@ -79,7 +76,6 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
       }
       
       if (parsed.channel === 'state') {
-        console.log('state', parsed)
         const exact = new StateEvent(parsed.body);
         const device = devices[exact.deviceId];
         if (!device) return;
@@ -87,7 +83,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
         return;
       } 
 
-      console.warn("unkown type", parsed)
+      console.warn("unknown type", parsed)
     }
   }, [lastMessage]);
 
@@ -105,7 +101,6 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
 
   useEffect(() => {
     api.devices().then(async (devices) => {
-      // devices.sort((a: DeviceEvent, b:DeviceEvent) => (a.name > b.name) ? 1 : -1)
       setDevices(devices);
       setLoading(false);
 

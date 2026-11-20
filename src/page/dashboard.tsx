@@ -1,26 +1,13 @@
-"use client";
-
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
 import { Modal, Row, Col, Button } from "react-bootstrap";
 import { Line } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  LineController,
-  LinearScale,
-  CategoryScale,
-  PointElement,
-  LineElement,
-  Filler,
-} from "chart.js";
 import DeviceEvent from "../api/types/device";
-import { CHART_COLORS } from "../chart-colors";
+import { CHART_COLORS } from "../chart-setup";
 import PowerIcon from "../element/power-icon";
 import HttpApi from "../api/http";
 import { DataPoint, HistoryMap } from "../App";
-
-ChartJS.register(LineController, LinearScale, CategoryScale, PointElement, LineElement, Filler);
 
 type DashboardProperties = {
   devices: DeviceEvent[];

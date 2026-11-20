@@ -1,5 +1,3 @@
-"use client";
-
 import DeviceEvent from "../api/types/device";
 
 const zeroPad = (num: number): string => String(num).padStart(2, '0')

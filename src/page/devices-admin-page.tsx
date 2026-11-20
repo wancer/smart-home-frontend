@@ -1,5 +1,3 @@
-"use client";
-
 import { useState } from "react";
 import { Button, Table, Modal, Form, Badge } from "react-bootstrap";
 import { useTranslation } from "react-i18next";

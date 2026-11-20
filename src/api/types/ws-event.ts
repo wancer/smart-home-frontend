@@ -1,5 +1,3 @@
-'use client';
-
 export class SensorEvent {
     public deviceId: number;
     public time: number;

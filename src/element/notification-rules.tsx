@@ -1,8 +1,7 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { Button, Form, InputGroup } from "react-bootstrap";
 import { TFunction } from "i18next";
+import { formatDuration } from "../format";
 import { useTranslation } from "react-i18next";
 import HttpApi, { HttpError } from "../api/http";
 import DeviceEvent from "../api/types/device";
@@ -40,13 +39,6 @@ function withUnit(metric: string, value: number): string {
   const unit = METRIC_UNITS[metric];
   if (!unit) return String(value);
   return unit === "%" || unit === "°C" ? `${value}${unit}` : `${value} ${unit}`;
-}
-
-function formatDuration(t: TFunction, sec: number): string {
-  if (sec % 86400 === 0) return t("notifications.durDay", { n: sec / 86400 });
-  if (sec % 3600 === 0) return t("notifications.durHour", { n: sec / 3600 });
-  if (sec % 60 === 0) return t("notifications.durMin", { n: sec / 60 });
-  return t("notifications.durSec", { n: sec });
 }
 
 function summarizeRule(t: TFunction, r: NotificationRuleInput): string {
@@ -309,7 +301,7 @@ function RuleEditor({ api, deviceId, rule, metrics, onClose, onSaved }: EditorPr
     patch(usesThreshold(kind) && !draft.metric ? { kind, metric: metrics[0] ?? "" } : { kind });
 
   const applyPreset = (p: Preset) =>
-    setDraft(prev => ({ ...toDraft({ ...p.input, message: prev.message, enabled: prev.enabled }) }));
+    setDraft(prev => toDraft({ ...p.input, message: prev.message, enabled: prev.enabled }));
 
   const threshold = usesThreshold(draft.kind);
   const dur = durationSec(draft);

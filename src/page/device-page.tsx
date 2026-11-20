@@ -1,50 +1,19 @@
-"use client";
-
 import { useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { useParams } from "react-router-dom";
 import { Button, ButtonGroup, Col } from "react-bootstrap";
 import DeviceConfigPanel from "../element/device-config-panel.tsx";
 import { Line } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  LineController,
-  LinearScale,
-  CategoryScale,
-  BarController,
-  BarElement,
-  PointElement,
-  LineElement,
-  Filler,
-  Legend,
-  Title,
-  Tooltip,
-  InteractionMode,
-} from "chart.js";
-
-ChartJS.register(
-  LineController,
-  LinearScale,
-  CategoryScale,
-  BarController,
-  BarElement,
-  PointElement,
-  LineElement,
-  Legend,
-  Tooltip,
-  Filler,
-  Title,
-);
 
 import DeviceEvent from "../api/types/device.ts";
-import { CHART_COLORS } from "../chart-colors.ts";
+import { CHART_COLORS, ChartColor, indexTooltip, lineChartBase, timeAxis } from "../chart-setup.ts";
 import HttpApi from "../api/http.ts";
 import SensorEventStat from "../api/types/sensor-event-stat.ts";
 import { SensorEvent } from "../api/types/ws-event.ts";
 import PowerIcon from "../element/power-icon.tsx";
 import IrPanel from "../element/ir-panel.tsx";
 import ChipTemperature from "../element/chip-temperature.tsx";
-import { formatDuration } from "../element/storage-tiers-editor.tsx";
+import { formatDuration } from "../format.ts";
 import { ChartPeriod, chartLabels, chartPeriods, defaultPeriodIndex, pageEnd, pageLabel } from "../chart-periods.ts";
 
 type DevicePageProperties = {
@@ -157,8 +126,6 @@ function withGaps(events: SensorEventStat[]): SensorEventStat[] {
   return result;
 }
 
-type ChartColor = { border: string; background: string };
-
 // bandDatasets draws the min-max range as a filled band (max fills down to min). They must
 // come right after each other; legend items for them are hidden by hideBandLegend.
 function bandDatasets(label: string, color: ChartColor, min: (number | null)[], max: (number | null)[], yAxisID = "y") {
@@ -178,13 +145,6 @@ function bandDatasets(label: string, color: ChartColor, min: (number | null)[], 
 const hideBandLegend = {
   labels: {
     filter: (item: { text: string }) => !item.text.endsWith(" max") && !item.text.endsWith(" min"),
-  },
-};
-
-const xAxisConfig = {
-  ticks: {
-    maxTicksLimit: 12,
-    maxRotation: 0,
   },
 };
 
@@ -317,25 +277,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
 
       { device.isEnergySensor() && (
         <>
-          <div className="row">
-            <div className="row font-monospace">
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.power} W </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.current} A </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.voltage} V </strong>
-                </h1>
-              </Col>
-            </div>
-          </div>
+          <CurrentValues values={[[device.state.power, "W"], [device.state.current, "A"], [device.state.voltage, "V"]]} />
 
           <div className="row">
             <div className="d-flex flex-wrap column-gap-2 align-items-center">
@@ -350,25 +292,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
 
       { device.isCo2Sensor() && (
         <>
-          <div className="row">
-            <div className="row font-monospace">
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.temperature} °C </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.humidity} % </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.co2} ppm </strong>
-                </h1>
-              </Col>
-            </div>
-          </div>
+          <CurrentValues values={[[device.state.temperature, "°C"], [device.state.humidity, "%"], [device.state.co2, "ppm"]]} />
 
           <div className="row">
             <div className="d-flex flex-wrap column-gap-2 align-items-center">
@@ -385,20 +309,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
 
       { device.isThSensor() && (
         <>
-          <div className="row">
-            <div className="row font-monospace">
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.temperature} °C </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.humidity} % </strong>
-                </h1>
-              </Col>
-            </div>
-          </div>
+          <CurrentValues values={[[device.state.temperature, "°C"], [device.state.humidity, "%"]]} />
 
           <div className="row">
             <div className="d-flex flex-wrap column-gap-2 align-items-center">
@@ -411,6 +322,21 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
         </>
       ) }
     </>
+  );
+}
+
+/** Current readings in large type, as [value, unit] pairs; a missing value shows just the unit. */
+function CurrentValues({ values }: { values: [number | null | undefined, string][] }) {
+  return (
+    <div className="row">
+      <div className="row font-monospace">
+        {values.map(([value, unit]) => (
+          <Col xs={4} key={unit}>
+            <h1><strong>{value} {unit}</strong></h1>
+          </Col>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -444,15 +370,10 @@ function ChartPower({ events, window }: ChartProperties) {
     ],
   };
   const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    interaction: { mode: "index" as InteractionMode, intersect: false },
-    plugins: {
-      legend: hideBandLegend,
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
+    ...lineChartBase,
+    plugins: { legend: hideBandLegend, tooltip: indexTooltip },
     scales: {
-      x: xAxisConfig,
+      x: timeAxis,
       y: {
         type: "linear" as const,
         position: "left" as const,
@@ -482,15 +403,10 @@ function ChartCo2({ events, window }: ChartProperties) {
     ],
   };
   const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    interaction: { mode: "index" as InteractionMode, intersect: false },
-    plugins: {
-      legend: hideBandLegend,
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
+    ...lineChartBase,
+    plugins: { legend: hideBandLegend, tooltip: indexTooltip },
     scales: {
-      x: xAxisConfig,
+      x: timeAxis,
       y: {
         min: 400,
         title: { display: true, text: "ppm" },
@@ -519,13 +435,10 @@ function ChartOnline({ events, window }: ChartProperties) {
     ],
   };
   const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    plugins: {
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
+    ...lineChartBase,
+    plugins: { tooltip: indexTooltip },
     scales: {
-      x: xAxisConfig,
+      x: timeAxis,
       y: {
         min: 0,
         max: 1,
@@ -568,15 +481,10 @@ function ChartTH({ events, window }: ChartProperties) {
     ],
   };
   const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    interaction: { mode: "index" as InteractionMode, intersect: false },
-    plugins: {
-      legend: hideBandLegend,
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
+    ...lineChartBase,
+    plugins: { legend: hideBandLegend, tooltip: indexTooltip },
     scales: {
-      x: xAxisConfig,
+      x: timeAxis,
       y: {
         type: "linear" as const,
         position: "left" as const,

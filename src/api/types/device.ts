@@ -1,5 +1,3 @@
-'use client';
-
 class DeviceState {
     public on: boolean|null;
     public last: number;
@@ -71,6 +69,8 @@ export type DeviceProfile = {
     chip: string | null;
     firmwareVersion: string | null;
     firmwareBuiltAt: string | null;
+    firmwareCore: string | null;
+    firmwareSdk: string | null;
     sensors: string[];
     /** Unix time of the last profile change/refresh. */
     profiledAt: number | null;
@@ -82,6 +82,8 @@ const emptyProfile: DeviceProfile = {
     chip: null,
     firmwareVersion: null,
     firmwareBuiltAt: null,
+    firmwareCore: null,
+    firmwareSdk: null,
     sensors: [],
     profiledAt: null,
     features: { relays: 0, statusLed: false, light: null, ir: false, energy: false, chipTemp: false },
@@ -115,11 +117,6 @@ export default class DeviceEvent {
         this.offlineTimeout = decoded.offlineTimeout ?? 0;
         this.sensorHistory = decoded.sensorHistory ?? undefined;
         this.storageTiers = decoded.storageTiers ?? [{ step: 300, keep: 0 }];
-    }
-
-    /** Whether the newest data is stored as raw readings rather than buckets. */
-    public storesRaw(): boolean {
-        return this.storageTiers[0]?.step === 0;
     }
 
     public isEnergySensor(): boolean {

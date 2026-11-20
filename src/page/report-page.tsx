@@ -1,20 +1,8 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Button, ButtonGroup, Spinner, Table } from "react-bootstrap";
 import { Bar } from "react-chartjs-2";
-import {
-  Chart as ChartJS,
-  CategoryScale,
-  LinearScale,
-  BarController,
-  BarElement,
-  Legend,
-  Tooltip,
-} from "chart.js";
-
-ChartJS.register(CategoryScale, LinearScale, BarController, BarElement, Legend, Tooltip);
+import "../chart-setup.ts";
 
 import HttpApi from "../api/http.ts";
 import DeviceEvent from "../api/types/device.ts";

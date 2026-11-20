@@ -1,6 +1,6 @@
 import DeviceEvent, { StorageTier } from "./types/device";
 import Login from "./types/login";
-import SensorEvent from "./types/sensor";
+import { SensorEvent } from "./types/ws-event";
 import { CredentialResponse } from '@react-oauth/google';
 import SensorDailyEvent from "./types/sensor-daily";
 import SensorEventStat from "./types/sensor-event-stat";
@@ -234,6 +234,8 @@ export default class HttpApi {
         firmware: {
             version: string | null;
             buildAt: string | null;
+            core: string | null;
+            sdk: string | null;
             latestVersion: string | null;
             updateAvailable: boolean;
         };

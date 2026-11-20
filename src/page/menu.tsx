@@ -1,5 +1,3 @@
-"use client";
-
 import { Link } from "react-router-dom";
 import { MouseEventHandler, useState } from "react";
 import { Nav, Button, Offcanvas, ButtonGroup } from "react-bootstrap";

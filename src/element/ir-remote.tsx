@@ -1,5 +1,3 @@
-"use client";
-
 import { useCallback, useEffect, useState } from "react";
 import { Button, Collapse, Form, Modal } from "react-bootstrap";
 import { useTranslation } from "react-i18next";

@@ -7,6 +7,7 @@ import Timer from "../api/types/timer";
 import Rule from "../api/types/rule";
 import timezones from '../page/timezones';
 import NotificationRules from "./notification-rules";
+import { formatElapsed } from "../format";
 
 type Props = {
   api: HttpApi;
@@ -39,6 +40,17 @@ function SaveBtn({ disabled, onClick }: { disabled: boolean; onClick: () => void
   );
 }
 
+/** Runs `load` each time `section` becomes the open one; true while it's running. Errors just end the loading. */
+function useSectionLoad(openSection: Section, section: Exclude<Section, null>, load: () => Promise<void>): boolean {
+  const [loading, setLoading] = useState(false);
+  useEffect(() => {
+    if (openSection !== section) return;
+    setLoading(true);
+    load().catch(() => {}).finally(() => setLoading(false));
+  }, [openSection]);
+  return loading;
+}
+
 export default function DeviceConfigPanel({ api, device, chipChartOpen = false, onToggleChipChart }: Props) {
   const { t } = useTranslation();
   const [inProgress, setInProgress] = useState(false);
@@ -66,6 +78,8 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
 
   const [firmwareVersion, setFirmwareVersion] = useState("");
   const [firmwareBuiltAt, setFirmwareBuiltAt] = useState("");
+  const [firmwareCore, setFirmwareCore] = useState<string | null>(device.profile.firmwareCore);
+  const [firmwareSdk, setFirmwareSdk] = useState<string | null>(device.profile.firmwareSdk);
   const [latestVersion, setLatestVersion] = useState<string | null>(null);
   const [updateAvailable, setUpdateAvailable] = useState(false);
   const [updateStarted, setUpdateStarted] = useState(false);
@@ -81,15 +95,9 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
   const [uptime, setUptime] = useState<number | null>(null);
   const [offlineTimeout, setOfflineTimeout] = useState<number | null>(null);
 
-  const [timingLoading, setTimingLoading] = useState(false);
-  const [ledLoading, setLedLoading] = useState(false);
-  const [hardwareLoading, setHardwareLoading] = useState(false);
-
   const [timers, setTimers] = useState<Timer[]>([]);
-  const [timersLoading, setTimersLoading] = useState(false);
 
   const [rules, setRules] = useState<Rule[]>([]);
-  const [rulesLoading, setRulesLoading] = useState(false);
 
   const loadConfig = () => {
     api.getConfig(device.id).then((config) => {
@@ -114,21 +122,15 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
     setPowerState(device.state.power);
   }, [device]);
 
-  useEffect(() => {
-    if (openSection !== "timing") return;
-    setTimingLoading(true);
+  const timingLoading = useSectionLoad(openSection, "timing", () =>
     api.getTiming(device.id).then(data => {
       if (data.telePeriod != null) setSensorsFreq(data.telePeriod);
       if (data.timezone != null) setTimezone(data.timezone);
       setUptimeBase(data.uptimeSec != null ? { sec: data.uptimeSec, at: Date.now() } : null);
       setOfflineTimeout(data.offlineTimeout ?? null);
-      setTimingLoading(false);
-    }).catch(() => setTimingLoading(false));
-  }, [openSection]);
+    }));
 
-  useEffect(() => {
-    if (openSection !== "led") return;
-    setLedLoading(true);
+  const ledLoading = useSectionLoad(openSection, "led", () =>
     api.getLed(device.id).then(data => {
       if (data.ledPower != null) setLedPower(data.ledPower);
       if (data.ledState != null) setLedMode(data.ledState);
@@ -140,24 +142,20 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
       if (data.lightPower != null) setLightPower(data.lightPower);
       if (data.dimmer != null) setDimmer(data.dimmer);
       if (data.color != null) setColor(data.color);
-      setLedLoading(false);
-    }).catch(() => setLedLoading(false));
-  }, [openSection]);
+    }));
 
-  useEffect(() => {
-    if (openSection !== "hardware") return;
-    setHardwareLoading(true);
+  const hardwareLoading = useSectionLoad(openSection, "hardware", () =>
     api.getHardware(device.id).then(data => {
       setHardwareChip(data.hardware);
       setChipTemperature(data.chipTemperature ?? null);
       setLoadAvg(data.loadAvg ?? null);
       setFirmwareVersion(data.firmware.version ?? "");
       setFirmwareBuiltAt(data.firmware.buildAt ?? "");
+      setFirmwareCore(data.firmware.core ?? null);
+      setFirmwareSdk(data.firmware.sdk ?? null);
       setLatestVersion(data.firmware.latestVersion ?? null);
       setUpdateAvailable(data.firmware.updateAvailable === true);
-      setHardwareLoading(false);
-    }).catch(() => setHardwareLoading(false));
-  }, [openSection]);
+    }));
 
   const refreshProfile = async () => {
     setProfileRefreshing(true);
@@ -172,6 +170,8 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
       setTemplateName(refreshed.profile.template?.name ?? null);
       setFirmwareVersion(refreshed.profile.firmwareVersion ?? "");
       setFirmwareBuiltAt(refreshed.profile.firmwareBuiltAt ?? "");
+      setFirmwareCore(refreshed.profile.firmwareCore ?? null);
+      setFirmwareSdk(refreshed.profile.firmwareSdk ?? null);
       if (refreshed.sensorType !== device.sensorType) {
         setProfileMsg({ ok: true, text: t('configPanel.refreshTypeChanged', { type: t('devicesAdmin.type_' + refreshed.sensorType, { defaultValue: refreshed.sensorType }) }) });
       } else {
@@ -203,25 +203,15 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
     }
   };
 
-  useEffect(() => {
-    if (openSection !== "timers") return;
-    setTimersLoading(true);
+  const timersLoading = useSectionLoad(openSection, "timers", () => {
     setTimers([]);
-    api.getTimers(device.id).then(result => {
-      setTimers(result);
-      setTimersLoading(false);
-    }).catch(() => setTimersLoading(false));
-  }, [openSection]);
+    return api.getTimers(device.id).then(setTimers);
+  });
 
-  useEffect(() => {
-    if (openSection !== "rules") return;
-    setRulesLoading(true);
+  const rulesLoading = useSectionLoad(openSection, "rules", () => {
     setRules([]);
-    api.getRules(device.id).then(result => {
-      setRules(result);
-      setRulesLoading(false);
-    }).catch(() => setRulesLoading(false));
-  }, [openSection]);
+    return api.getRules(device.id).then(setRules);
+  });
 
   useEffect(() => {
     if (openSection !== "timing") return;
@@ -246,10 +236,13 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
 
   const run = async (action: () => Promise<void>) => {
     setInProgress(true);
-    await action();
-    await delay(1000);
-    loadConfig();
-    setInProgress(false);
+    try {
+      await action();
+      await delay(1000);
+      loadConfig();
+    } finally {
+      setInProgress(false);
+    }
   };
 
   const switchOnOff = () =>
@@ -402,7 +395,7 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
                 <Form.Group as={Row} className="mb-3" controlId="cfgOfflineTimeout">
                   <Form.Label column sm="3">{t('configPanel.offlineTimeout')}</Form.Label>
                   <Col sm="9" className="d-flex align-items-center">
-                    {formatDuration(offlineTimeout)}
+                    {formatElapsed(offlineTimeout)}
                     <span className="text-muted small ms-2">
                       ({device.offlineTimeout > 0 ? t('configPanel.offlineTimeoutFixed') : t('configPanel.offlineTimeoutAuto')})
                     </span>
@@ -413,7 +406,7 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
                 <Form.Group as={Row} className="mb-3" controlId="cfgUptime">
                   <Form.Label column sm="3">{t('configPanel.uptime')}</Form.Label>
                   <Col sm="9" className="d-flex align-items-center font-monospace">
-                    <i className="fa fa-hourglass-half me-2 text-secondary"></i>{formatDuration(uptime)}
+                    <i className="fa fa-hourglass-half me-2 text-secondary"></i>{formatElapsed(uptime)}
                   </Col>
                 </Form.Group>
               )}
@@ -796,6 +789,18 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
                   <Form.Label column sm="3">{t('configPanel.buildAt')}</Form.Label>
                   <Col sm="9" className="d-flex align-items-center">{firmwareBuiltAt}</Col>
                 </Form.Group>
+                {firmwareCore && (
+                  <Form.Group as={Row} className="mb-3" controlId="cfgFwCore">
+                    <Form.Label column sm="3">{t('configPanel.core')}</Form.Label>
+                    <Col sm="9" className="d-flex align-items-center">{firmwareCore}</Col>
+                  </Form.Group>
+                )}
+                {firmwareSdk && (
+                  <Form.Group as={Row} className="mb-3" controlId="cfgFwSdk">
+                    <Form.Label column sm="3">{t('configPanel.sdk')}</Form.Label>
+                    <Col sm="9" className="d-flex align-items-center">{firmwareSdk}</Col>
+                  </Form.Group>
+                )}
                 <Form.Group as={Row} className="mb-3">
                   <Col sm={{ span: 9, offset: 3 }}>
                     <Button variant="outline-secondary" size="sm" disabled={profileRefreshing} onClick={refreshProfile}
@@ -815,16 +820,4 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
       </Modal>
     </>
   );
-}
-
-/** 10208 -> "2h 50m 08s", 183600 -> "2d 3h 00m 00s" */
-function formatDuration(totalSec: number): string {
-  const d = Math.floor(totalSec / 86400);
-  const h = Math.floor(totalSec % 86400 / 3600);
-  const m = Math.floor(totalSec % 3600 / 60);
-  const s = totalSec % 60;
-  const pad = (n: number) => n.toString().padStart(2, "0");
-  if (d > 0) return `${d}d ${h}h ${pad(m)}m ${pad(s)}s`;
-  if (h > 0) return `${h}h ${pad(m)}m ${pad(s)}s`;
-  return `${m}m ${pad(s)}s`;
 }

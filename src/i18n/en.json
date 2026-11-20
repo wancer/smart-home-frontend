@@ -113,6 +113,8 @@
     "chip": "Chip",
     "version": "Version",
     "buildAt": "Build At",
+    "core": "Core",
+    "sdk": "SDK",
     "latestVersion": "Latest version",
     "updateFirmware": "Update firmware",
     "updateConfirm": "The device will restart and be offline for a few minutes. Update firmware now?",
@@ -292,10 +294,6 @@
     "metric_co2": "CO₂",
     "metric_temperature": "Temperature",
     "metric_humidity": "Humidity",
-    "durSec": "{{n}} s",
-    "durMin": "{{n}} min",
-    "durHour": "{{n}} h",
-    "durDay": "{{n}} d",
     "sumOffline": "Offline",
     "sumOfflineFor": "Offline for {{d}}",
     "sumOnline": "Back online",
@@ -321,9 +319,6 @@
   },
   "storageTiers": {
     "raw": "every reading",
-    "minutes": "{{count}} min",
-    "hours": "{{count}} h",
-    "days": "{{count}} d",
     "first": "Keep",
     "then": "then",
     "for": "for",
@@ -342,5 +337,11 @@
     "err_stepGrow": "Each tier's bucket must be bigger than the previous one.",
     "err_stepMultiple": "Each tier's bucket must be a multiple of the previous one (e.g. 10 min → 15 min doesn't fit).",
     "err_keepGrow": "Each tier must be kept longer than the previous one."
+  },
+  "duration": {
+    "seconds": "{{count}} s",
+    "minutes": "{{count}} min",
+    "hours": "{{count}} h",
+    "days": "{{count}} d"
   }
 }

@@ -113,6 +113,8 @@
     "chip": "Чіп",
     "version": "Версія",
     "buildAt": "Зібрано",
+    "core": "Ядро",
+    "sdk": "SDK",
     "latestVersion": "Остання версія",
     "updateFirmware": "Оновити прошивку",
     "updateConfirm": "Пристрій перезавантажиться і буде офлайн кілька хвилин. Оновити прошивку зараз?",
@@ -292,10 +294,6 @@
     "metric_co2": "CO₂",
     "metric_temperature": "Температура",
     "metric_humidity": "Вологість",
-    "durSec": "{{n}} с",
-    "durMin": "{{n}} хв",
-    "durHour": "{{n}} год",
-    "durDay": "{{n}} дн",
     "sumOffline": "Офлайн",
     "sumOfflineFor": "Офлайн протягом {{d}}",
     "sumOnline": "Знову онлайн",
@@ -321,9 +319,6 @@
   },
   "storageTiers": {
     "raw": "кожне вимірювання",
-    "minutes": "{{count}} хв",
-    "hours": "{{count}} год",
-    "days": "{{count}} д",
     "first": "Зберігати",
     "then": "далі",
     "for": "протягом",
@@ -342,5 +337,11 @@
     "err_stepGrow": "Інтервал кожного рівня має бути більшим за попередній.",
     "err_stepMultiple": "Інтервал кожного рівня має бути кратним попередньому (напр. 10 хв → 15 хв не підходить).",
     "err_keepGrow": "Кожен рівень має зберігатися довше за попередній."
+  },
+  "duration": {
+    "seconds": "{{count}} с",
+    "minutes": "{{count}} хв",
+    "hours": "{{count}} год",
+    "days": "{{count}} дн"
   }
 }

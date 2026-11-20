@@ -1,5 +1,3 @@
-'use client';
-
 import "./App.scss";
 
 import { StrictMode, useEffect, useState } from 'react'

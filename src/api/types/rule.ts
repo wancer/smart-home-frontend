@@ -1,5 +1,3 @@
-'use client';
-
 export default class Rule {
     public n: number;
     public state: number;

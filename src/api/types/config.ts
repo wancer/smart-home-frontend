@@ -1,5 +1,3 @@
-'use client';
-
 class LedConfig {
     public ledState:	number;
     public ledPower:	boolean;

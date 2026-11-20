@@ -1,14 +1,11 @@
-"use client";
-
 import { useEffect, useState } from "react";
 import { useTranslation } from "react-i18next";
 import { Line } from "react-chartjs-2";
-import { InteractionMode } from "chart.js";
 import HttpApi from "../api/http.ts";
 import DeviceEvent from "../api/types/device.ts";
 import SensorEventStat from "../api/types/sensor-event-stat.ts";
 import { SensorEvent } from "../api/types/ws-event.ts";
-import { CHART_COLORS } from "../chart-colors.ts";
+import { CHART_COLORS, indexTooltip, lineChartBase, timeAxis } from "../chart-setup.ts";
 
 const BUCKET_S = 300;
 
@@ -92,14 +89,10 @@ function ChartChipTemperature({ points, label }: { points: Point[]; label: strin
     ],
   };
   const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    interaction: { mode: "index" as InteractionMode, intersect: false },
-    plugins: {
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
+    ...lineChartBase,
+    plugins: { tooltip: indexTooltip },
     scales: {
-      x: { ticks: { maxTicksLimit: 12, maxRotation: 0 } },
+      x: timeAxis,
       y: { title: { display: true, text: "°C" } },
     },
   };

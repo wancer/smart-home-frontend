@@ -1,5 +1,3 @@
-'use client';
-
 export default class SensorEventStat {
     public time: number;
     public powerConsumed: number | null;

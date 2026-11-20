@@ -46,7 +46,7 @@ type ReportPageProperties = {
 
 export default function ReportPage({ api, devices }: ReportPageProperties) {
   const { t, i18n } = useTranslation();
-  const energyDevices = Object.values(devices).filter((d) => d.enabled && d.isEnergySensor());
+  const energyDevices = Object.values(devices).filter((d) => d.enabled && (d.isEnergySensor() || d.profile.features.energy));
 
   const [month, setMonth] = useState<MonthYear>(() => {
     const now = new Date();

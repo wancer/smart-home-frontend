@@ -1,15 +1,21 @@
-class DeviceState {
+import { MetricValues, readMetrics } from "../../metrics";
+
+class DeviceState implements MetricValues {
     public on: boolean|null;
     public last: number;
     public deviceTime: string;
 
-    public power: number;
-    public current: number;
-    public voltage: number;
-
-    public co2: number;
-    public temperature: number;
-    public humidity: number;
+    // null = the device doesn't report it
+    public power!: number | null;
+    public current!: number | null;
+    public voltage!: number | null;
+    public temperature!: number | null;
+    public humidity!: number | null;
+    public co2!: number | null;
+    public pressure!: number | null;
+    public dcPower!: number | null;
+    public dcCurrent!: number | null;
+    public dcVoltage!: number | null;
 
     public chipTemperature: number | null;
 
@@ -17,15 +23,7 @@ class DeviceState {
         this.on = decoded.on;
         this.last = decoded.last;
         this.deviceTime = "";
-
-        this.power = decoded.power;
-        this.current = decoded.current;
-        this.voltage = decoded.voltage;
-
-        this.co2 = decoded.co2;
-        this.temperature = decoded.temperature;
-        this.humidity = decoded.humidity;
-
+        Object.assign(this, readMetrics(decoded));
         this.chipTemperature = decoded.chipTemperature ?? null;
     }
 }
@@ -95,7 +93,7 @@ export default class DeviceEvent {
     public topic: string;
     public enabled: boolean;
     public state: DeviceState;
-    /** Detected from the profile: energy, co2, t-h, ir or other. */
+    /** Detected from the profile: energy, co2, t-h, multi, ir or other. */
     public sensorType: string;
     /** Has a relay (from the template) and isn't an IR remote. */
     public supportsToggle: boolean;
@@ -131,12 +129,16 @@ export default class DeviceEvent {
         return this.sensorType === 't-h';
     }
 
+    public isMultiSensor(): boolean {
+        return this.sensorType === 'multi';
+    }
+
     public isIrRemote(): boolean {
         return this.sensorType === 'ir';
     }
 
-    /** Energy, CO₂ or T-H: has stored sensor data (not IR remotes or unrecognised devices). */
+    /** Energy, CO₂, T-H or multi: has stored sensor data (not IR remotes or unrecognised devices). */
     public hasSensorData(): boolean {
-        return this.isEnergySensor() || this.isCo2Sensor() || this.isThSensor();
+        return this.isEnergySensor() || this.isCo2Sensor() || this.isThSensor() || this.isMultiSensor();
     }
 }

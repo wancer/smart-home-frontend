@@ -121,10 +121,10 @@ export default class HttpApi {
     public async sensorsMulti(deviceIds: number[]): Promise<Record<number, SensorEvent[]>> {
         try {
             const qs = deviceIds.map(id => `ids=${id}`).join('&');
-            const data = await this.get<Record<string, SensorEvent[]>>(`/api/sensors?${qs}`);
+            const data = await this.get<Record<string, unknown[]>>(`/api/sensors?${qs}`);
             const result: Record<number, SensorEvent[]> = {};
             for (const [key, value] of Object.entries(data)) {
-                result[Number(key)] = value;
+                result[Number(key)] = (value ?? []).map(s => new SensorEvent(s));
             }
             return result;
         } catch (e) {
@@ -141,9 +141,10 @@ export default class HttpApi {
         return this.get(`/api/devices/${deviceId}/sensors/daily${qs}`);
     }
 
-    public sensorsConfigurable(deviceId: number, duration: string, scale: string, till?: number): Promise<SensorEventStat[]> {
+    public async sensorsConfigurable(deviceId: number, duration: string, scale: string, till?: number): Promise<SensorEventStat[]> {
         const qs = till !== undefined ? `?till=${till}` : '';
-        return this.get(`/api/devices/${deviceId}/sensors/${duration}/${scale}${qs}`);
+        const raw = await this.get<unknown[]>(`/api/devices/${deviceId}/sensors/${duration}/${scale}${qs}`);
+        return (raw ?? []).map(s => new SensorEventStat(s));
     }
 
     public async devices(): Promise<DeviceEvent[]> {

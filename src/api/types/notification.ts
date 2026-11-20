@@ -11,6 +11,10 @@ export const METRIC_UNITS: Record<string, string> = {
     co2: "ppm",
     temperature: "°C",
     humidity: "%",
+    pressure: "hPa",
+    dc_voltage: "V",
+    dc_current: "A",
+    dc_power: "W",
 };
 
 /** Upper bounds enforced by the backend. */

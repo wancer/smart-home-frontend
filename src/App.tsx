@@ -8,6 +8,7 @@ import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket"
 import {BrowserRouter, Routes, Route, } from "react-router-dom";
 import { Alert, Button, Container, Row, Spinner } from 'react-bootstrap';
 import { useToasts } from "./element/use-toasts.tsx";
+import { METRICS, sparklineMetric } from "./metrics.ts";
 
 import Menu from "./page/menu.tsx";
 import { DashboardPage } from "./page/dashboard.tsx";
@@ -47,24 +48,18 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
         // Events can arrive before the device list has loaded, or for a device we don't know about.
         if (!device) return;
 
-        device.state.current = exact.current;
-        device.state.voltage = exact.voltage;
-        device.state.power = exact.power;
+        for (const m of METRICS) device.state[m.key] = exact[m.key];
         device.state.last = exact.time;
         device.state.deviceTime = exact.deviceTime;
-
-        device.state.co2 = exact.co2;
-        device.state.temperature = exact.temperature;
-        device.state.humidity = exact.humidity;
         device.state.chipTemperature = exact.chipTemperature;
 
         setLatestSensorEvent(exact);
 
         if (!device.hasSensorData()) return;
 
-        const value = device.isEnergySensor() ? exact.power
-                    : device.isCo2Sensor()    ? exact.co2
-                    : exact.temperature;
+        const metric = sparklineMetric(device.state);
+        const value = metric ? exact[metric.key] : null;
+        if (value == null) return;
         const now = exact.time;
         setHistoryMap(prev => {
           const cutoff = now - FIVE_MIN_S;
@@ -109,11 +104,11 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
       const newHistoryMap: HistoryMap = {};
       for (const device of enabledDevices) {
         const records = allRecords[device.id] ?? [];
+        // follow the current state's metric, or the newest record's when the state has none
+        const metric = sparklineMetric(device.state) ?? (records.length ? sparklineMetric(records[records.length - 1]) : null);
         newHistoryMap[device.id] = records
           .flatMap(s => {
-            const value = device.isEnergySensor() ? s.power
-                        : device.isCo2Sensor()    ? s.co2
-                        : s.temperature;
+            const value = metric ? s[metric.key] : null;
             return value != null ? [{ time: s.time, value }] : [];
           })
           .sort((a, b) => a.time - b.time);

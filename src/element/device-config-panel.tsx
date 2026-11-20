@@ -118,8 +118,8 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
   };
 
   useEffect(() => {
-    setVoltageState(device.state.voltage);
-    setPowerState(device.state.power);
+    setVoltageState(device.state.voltage ?? 0);
+    setPowerState(device.state.power ?? 0);
   }, [device]);
 
   const timingLoading = useSectionLoad(openSection, "timing", () =>
@@ -291,7 +291,8 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
     { section: "timing", icon: "fa-clock" },
     ...(!templateKnown || device.profile.features.statusLed || device.profile.features.light
       ? [{ section: "led" as const, icon: "fa-lightbulb" }] : []),
-    ...(device.isEnergySensor() ? [{ section: "calibration" as const, icon: "fa-gauge" }] : []),
+    // AC energy-meter calibration (energy plugs, and multi-sensors with an ENERGY meter)
+    ...(device.isEnergySensor() || device.profile.features.energy ? [{ section: "calibration" as const, icon: "fa-gauge" }] : []),
     { section: "hardware", icon: "fa-microchip" },
     { section: "timers", icon: "fa-stopwatch" },
     { section: "rules", icon: "fa-code" },

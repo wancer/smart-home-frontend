@@ -37,10 +37,11 @@ ChartJS.register(
 );
 
 import DeviceEvent from "../api/types/device.ts";
-import { CHART_COLORS } from "../chart-colors.ts";
+import { CHART_COLORS, ChartColor } from "../chart-colors.ts";
 import HttpApi from "../api/http.ts";
 import SensorDailyEvent from "../api/types/sensor-daily.ts";
-import SensorEventStat from "../api/types/sensor-event-stat.ts";
+import SensorEventStat, { StatKind } from "../api/types/sensor-event-stat.ts";
+import { CHART_GROUPS, formatMetric, Metric, METRIC_BY_KEY, MetricKey, METRICS, reportedMetrics } from "../metrics.ts";
 import { SensorEvent } from "../api/types/ws-event.ts";
 import PowerIcon from "../element/power-icon.tsx";
 import IrPanel from "../element/ir-panel.tsx";
@@ -65,39 +66,28 @@ function bucketMax(prev: number | null | undefined, next: number, n: number): nu
   return n === 1 || prev == null ? next : Math.max(prev, next);
 }
 
-function buildBucketStat(bucketTime: number, e: SensorEvent, prev: SensorEventStat | null, n: number, device: DeviceEvent): SensorEventStat {
-  const stat: any = {
+// buildBucketStat folds a live reading into its bucket. Every metric the reading carries is
+// averaged; one it lacks keeps the bucket's earlier values.
+function buildBucketStat(bucketTime: number, e: SensorEvent, prev: SensorEventStat | null, n: number): SensorEventStat {
+  const stat: Record<string, number | null> = {
     time: bucketTime,
     powerConsumed: prev?.powerConsumed ?? null,
-    powerAvg: null,
-    currentAvg: null,
-    voltageAvg: null,
-    co2Avg: null,
-    temperatureAvg: null,
-    humidityAvg: null,
   };
 
-  if (device.isEnergySensor()) {
-    stat.powerAvg   = weightedAvg(prev?.powerAvg,   e.power,   n);
-    stat.powerMin   = bucketMin(prev?.powerMin,     e.power,   n);
-    stat.powerMax   = bucketMax(prev?.powerMax,     e.power,   n);
-    stat.currentAvg = weightedAvg(prev?.currentAvg, e.current, n);
-    stat.voltageAvg = weightedAvg(prev?.voltageAvg, e.voltage, n);
-  }
-
-  if (device.isCo2Sensor()) {
-    stat.co2Avg = weightedAvg(prev?.co2Avg, e.co2, n);
-    stat.co2Min = bucketMin(prev?.co2Min,   e.co2, n);
-    stat.co2Max = bucketMax(prev?.co2Max,   e.co2, n);
-  }
-
-  if (device.isCo2Sensor() || device.isThSensor()) {
-    stat.temperatureAvg = weightedAvg(prev?.temperatureAvg, e.temperature, n);
-    stat.temperatureMin = bucketMin(prev?.temperatureMin,   e.temperature, n);
-    stat.temperatureMax = bucketMax(prev?.temperatureMax,   e.temperature, n);
-    stat.humidityAvg    = weightedAvg(prev?.humidityAvg,    e.humidity,    n);
-    stat.humidityMin    = bucketMin(prev?.humidityMin,      e.humidity,    n);
-    stat.humidityMax    = bucketMax(prev?.humidityMax,      e.humidity,    n);
+  for (const m of METRICS) {
+    const v = e[m.key];
+    const pAvg = prev?.get(m.key, "Avg") ?? null;
+    const pMin = prev?.get(m.key, "Min") ?? null;
+    const pMax = prev?.get(m.key, "Max") ?? null;
+    if (v == null) {
+      stat[m.key + "Avg"] = pAvg;
+      stat[m.key + "Min"] = pMin;
+      stat[m.key + "Max"] = pMax;
+      continue;
+    }
+    stat[m.key + "Avg"] = weightedAvg(pAvg, v, n);
+    stat[m.key + "Min"] = bucketMin(pMin, v, n);
+    stat[m.key + "Max"] = bucketMax(pMax, v, n);
   }
 
   return new SensorEventStat(stat);
@@ -112,7 +102,6 @@ function upsertBucket(
   bucketSize: number,
   windowSeconds: number,
   counts: Record<number, number>,
-  device: DeviceEvent,
 ): SensorEventStat[] {
   const bucketTime = bucketSize === 0 ? e.time : Math.floor(e.time / bucketSize) * bucketSize;
   const last = events.at(-1);
@@ -120,13 +109,13 @@ function upsertBucket(
   if (last && last.time === bucketTime) {
     const n = (counts[bucketTime] ?? 1) + 1;
     counts[bucketTime] = n;
-    return [...events.slice(0, -1), buildBucketStat(bucketTime, e, last, n, device)];
+    return [...events.slice(0, -1), buildBucketStat(bucketTime, e, last, n)];
   }
 
   if (!last || bucketTime > last.time) {
     counts[bucketTime] = 1;
     const kept = events.filter(r => r.time > bucketTime - windowSeconds);
-    return [...kept, buildBucketStat(bucketTime, e, null, 1, device)];
+    return [...kept, buildBucketStat(bucketTime, e, null, 1)];
   }
 
   return events;
@@ -164,7 +153,6 @@ function chartLabels(events: SensorEventStat[]): string[] {
     : { hour: "2-digit", minute: "2-digit" }));
 }
 
-type ChartColor = { border: string; background: string };
 
 // bandDatasets draws the min-max range as a filled band (max fills down to min). They must
 // come right after each other; legend items for them are hidden by hideBandLegend.
@@ -204,7 +192,6 @@ function chartRange(p: LivePeriod, device: DeviceEvent): [string, string, number
   if (p === "1h") return device.storesRaw() ? ["1h", "raw", 0, 3600] : ["1h", "1m", 60, 3600];
   return ["24h", "5m", 300, 86400];
 }
-type Co2Chart = "co2" | "th";
 type ChartMode = "sensor" | "online";
 
 function todayStr(): string {
@@ -247,7 +234,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
   const [eventsMonthly, setEventsMonthly] = useState<SensorDailyEvent[] | undefined>(undefined);
   const [events, setEvents] = useState<SensorEventStat[] | undefined>(undefined);
   const [period, setPeriod] = useState<Period>("24h");
-  const [co2Chart, setCo2Chart] = useState<Co2Chart>("co2");
+  const [chartGroupId, setChartGroupId] = useState<string | null>(null);
   const [chartMode, setChartMode] = useState<ChartMode>("sensor");
   const [selectedDate, setSelectedDate] = useState<string>(todayStr());
   const [chipChartOpen, setChipChartOpen] = useState(false);
@@ -270,7 +257,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
   useEffect(() => {
     setEventsMonthly(undefined);
     setPeriod("24h");
-    setCo2Chart("co2");
+    setChartGroupId(null);
     setChartMode("sensor");
     setSelectedDate(todayStr());
     setChipChartOpen(false);
@@ -287,7 +274,7 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
     if (period === "30d" || (period === "24h" && selectedDate !== todayStr())) return;
     const e = latestSensorEvent;
     const [, , requestedStep, windowSeconds] = chartRange(period, device);
-    setEvents(prev => prev ? upsertBucket(prev, e, chartStep(prev, requestedStep), windowSeconds, counts.current, device) : prev);
+    setEvents(prev => prev ? upsertBucket(prev, e, chartStep(prev, requestedStep), windowSeconds, counts.current) : prev);
   }, [latestSensorEvent]);
 
 
@@ -306,6 +293,14 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
     setSelectedDate(newDate);
     loadEvents("24h", newDate);
   }
+
+  // Chart tabs for what the device reports (now or in the loaded range), not what its type implies.
+  const chartGroups = CHART_GROUPS.filter(g => g.metrics.some(k =>
+    device.state[k] != null || chartEvents?.some(r => r.get(k, "Avg") != null)));
+  const chartGroup = chartGroups.find(g => g.id === chartGroupId) ?? chartGroups[0];
+  // daily consumption exists for AC energy only
+  const hasAcEnergy = device.isEnergySensor() || device.state.power != null;
+  const periods: Period[] = hasAcEnergy ? ["1h", "24h", "30d"] : ["1h", "24h"];
 
   return (
     <>
@@ -326,106 +321,46 @@ export function DevicePage({ api, devices, latestSensorEvent }: DevicePageProper
 
       { device.isIrRemote() && <IrPanel key={"ir-" + device.id} api={api} device={device} devices={devices} /> }
 
-      { device.isEnergySensor() && (
+      { !device.isIrRemote() && (
         <>
-          <div className="row">
-            <div className="row font-monospace">
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.power} W </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.current} A </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.voltage} V </strong>
-                </h1>
-              </Col>
-            </div>
-          </div>
+          <MetricTiles device={device} />
 
           <div className="row">
-            <div className="d-flex gap-2 align-items-center">
-              <ButtonSelector options={["1h", "24h", "30d"] as Period[]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h"), t("devicePage.period_30d")]} current={period} onChange={changePeriod} />
+            <div className="d-flex flex-wrap gap-2 align-items-center">
+              <ButtonSelector options={periods} labels={periods.map(p => t("devicePage.period_" + p))} current={period} onChange={changePeriod} />
               {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
+              {period !== "30d" && chartMode === "sensor" && chartGroups.length > 1 && chartGroup && (
+                <ButtonSelector options={chartGroups.map(g => g.id)} labels={chartGroups.map(g => t(g.labelKey))} current={chartGroup.id} onChange={setChartGroupId} />
+              )}
               {period !== "30d" && <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />}
             </div>
-            {period !== "30d" && chartMode === "sensor" && (chartEvents === undefined ? <ChartSpinner /> : <ChartPower events={chartEvents} />)}
+            {period !== "30d" && chartMode === "sensor" && (chartEvents === undefined ? <ChartSpinner /> : <ChartMetrics events={chartEvents} metrics={chartGroup?.metrics ?? []} />)}
             {period === "30d"                           && (eventsMonthly === undefined ? <ChartSpinner /> : <ChartDailyConsumption dailyEvents={eventsMonthly} />)}
             {period !== "30d" && chartMode === "online" && (chartEvents === undefined ? <ChartSpinner /> : <ChartOnline events={chartEvents} />)}
           </div>
         </>
       ) }
-
-      { device.isCo2Sensor() && (
-        <>
-          <div className="row">
-            <div className="row font-monospace">
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.temperature} °C </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.humidity} % </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.co2} ppm </strong>
-                </h1>
-              </Col>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="d-flex gap-2 align-items-center">
-              <ButtonSelector options={["1h", "24h"] as Period[]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
-              {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
-              {chartMode === "sensor" && <ButtonSelector options={["co2", "th"]} labels={["CO₂", "T&H"]} current={co2Chart} onChange={setCo2Chart} />}
-              <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
-            </div>
-            {period !== "30d" && chartMode === "sensor" && co2Chart === "co2"  && (chartEvents === undefined ? <ChartSpinner /> : <ChartCo2  events={chartEvents} />)}
-            {period !== "30d" && chartMode === "sensor" && co2Chart === "th"   && (chartEvents === undefined ? <ChartSpinner /> : <ChartTH   events={chartEvents} />)}
-            {period !== "30d" && chartMode === "online"                        && (chartEvents === undefined ? <ChartSpinner /> : <ChartOnline events={chartEvents} />)}
-          </div>
-        </>
-      ) }
-
-      { device.isThSensor() && (
-        <>
-          <div className="row">
-            <div className="row font-monospace">
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.temperature} °C </strong>
-                </h1>
-              </Col>
-              <Col xs={4}>
-                <h1>
-                  <strong> {device.state.humidity} % </strong>
-                </h1>
-              </Col>
-            </div>
-          </div>
-
-          <div className="row">
-            <div className="d-flex gap-2 align-items-center">
-              <ButtonSelector options={["1h", "24h"] as Period[]} labels={[t("devicePage.period_1h"), t("devicePage.period_24h")]} current={period} onChange={changePeriod} />
-              {period === "24h" && <input type="date" className="form-control form-control-sm w-auto mb-3" value={selectedDate} max={todayStr()} onChange={(e) => handleDateChange(e.target.value)} />}
-              <ButtonSelector options={["sensor", "online"] as ChartMode[]} labels={[t("devicePage.sensor"), t("devicePage.online")]} current={chartMode} onChange={setChartMode} />
-            </div>
-            {period !== "30d" && chartMode === "sensor" && (chartEvents === undefined ? <ChartSpinner /> : <ChartTH events={chartEvents} />)}
-            {period !== "30d" && chartMode === "online" && (chartEvents === undefined ? <ChartSpinner /> : <ChartOnline events={chartEvents} />)}
-          </div>
-        </>
-      ) }
     </>
+  );
+}
+
+// MetricTiles shows every value the device currently reports, whatever its sensor type.
+function MetricTiles({ device }: { device: DeviceEvent }) {
+  const values = reportedMetrics(device.state);
+  if (values.length === 0) return null;
+  return (
+    <div className="row">
+      <div className="row font-monospace">
+        {values.map(m => (
+          <Col xs={4} key={m.key}>
+            <h1>
+              <strong> {formatMetric(m, device.state[m.key] as number)} {m.unit} </strong>
+              {m.tag && <small className="text-muted fs-5">{m.tag}</small>}
+            </h1>
+          </Col>
+        ))}
+      </div>
+    </div>
   );
 }
 
@@ -473,81 +408,6 @@ function ChartDailyConsumption({ dailyEvents }: DailyChartProperties) {
   return <Bar data={data} options={options} />;
 }
 
-function ChartPower({ events }: { events: SensorEventStat[] }) {
-  const data = {
-    labels: chartLabels(events),
-    datasets: [
-      {
-        label: "W",
-        borderColor: CHART_COLORS.power.border,
-        backgroundColor: CHART_COLORS.power.background,
-        fill: false,
-        tension: 0.3,
-        pointRadius: 0,
-        yAxisID: "y",
-        data: events.map((r) => r.powerAvg),
-      },
-      ...bandDatasets("W", CHART_COLORS.power, events.map((r) => r.powerMin), events.map((r) => r.powerMax)),
-    ],
-  };
-  const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    interaction: { mode: "index" as InteractionMode, intersect: false },
-    plugins: {
-      legend: hideBandLegend,
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
-    scales: {
-      x: xAxisConfig,
-      y: {
-        type: "linear" as const,
-        position: "left" as const,
-        min: 0,
-        title: { display: true, text: "W" },
-      },
-    },
-  };
-
-  return <Line data={data} options={options} />;
-}
-
-function ChartCo2({ events }: { events: SensorEventStat[] }) {
-  const data = {
-    labels: chartLabels(events),
-    datasets: [
-      {
-        label: "CO₂ ppm",
-        borderColor: CHART_COLORS.co2.border,
-        backgroundColor: CHART_COLORS.co2.background,
-        fill: false,
-        tension: 0.3,
-        pointRadius: 0,
-        data: events.map((r) => r.co2Avg),
-      },
-      ...bandDatasets("CO₂ ppm", CHART_COLORS.co2, events.map((r) => r.co2Min), events.map((r) => r.co2Max)),
-    ],
-  };
-  const options = {
-    responsive: true,
-    animation: { duration: 0 },
-    interaction: { mode: "index" as InteractionMode, intersect: false },
-    plugins: {
-      legend: hideBandLegend,
-      tooltip: { mode: "index" as InteractionMode, intersect: false },
-    },
-    scales: {
-      x: xAxisConfig,
-      y: {
-        min: 400,
-        title: { display: true, text: "ppm" },
-      },
-    },
-  };
-
-  return <Line data={data} options={options} />;
-}
-
 function ChartOnline({ events }: { events: SensorEventStat[] }) {
   const data = {
     labels: chartLabels(events),
@@ -559,9 +419,7 @@ function ChartOnline({ events }: { events: SensorEventStat[] }) {
         fill: true,
         stepped: true,
         pointRadius: 0,
-        data: events.map((r) =>
-          r.powerAvg != null || r.co2Avg != null || r.temperatureAvg != null ? 1 : 0
-        ),
+        data: events.map((r) => METRICS.some(m => r.get(m.key, "Avg") != null) ? 1 : 0),
       },
     ],
   };
@@ -586,34 +444,50 @@ function ChartOnline({ events }: { events: SensorEventStat[] }) {
   return <Line data={data} options={options} />;
 }
 
-function ChartTH({ events }: { events: SensorEventStat[] }) {
-  const data = {
-    labels: chartLabels(events),
-    datasets: [
+// ChartMetrics draws one or two metrics (left / right axis), each as its average with a
+// min-max band. A metric with no reading in the whole range is left out.
+function ChartMetrics({ events, metrics }: { events: SensorEventStat[]; metrics: MetricKey[] }) {
+  const { t } = useTranslation();
+  const shown = metrics.map(k => METRIC_BY_KEY[k]).filter(m => events.some(r => r.get(m.key, "Avg") != null));
+  if (shown.length === 0) {
+    return <div className="text-center text-muted py-5">{t("devicePage.noData")}</div>;
+  }
+
+  const round = (m: Metric, v: number | null) => v == null || m.precision === undefined ? v : +v.toFixed(m.precision);
+  const series = (m: Metric, kind: StatKind) => events.map(r => round(m, r.get(m.key, kind)));
+  const axisIds = ["y", "y1"];
+
+  const datasets = shown.flatMap((m, i) => {
+    const min = series(m, "Min");
+    const max = series(m, "Max");
+    const hasBand = min.some(v => v != null) && max.some(v => v != null);
+    return [
       {
-        label: "°C",
-        borderColor: CHART_COLORS.temperature.border,
-        backgroundColor: CHART_COLORS.temperature.background,
+        label: m.chartLabel,
+        borderColor: m.color.border,
+        backgroundColor: m.color.background,
         fill: false,
         tension: 0.3,
         pointRadius: 0,
-        yAxisID: "y",
-        data: events.map((r) => r.temperatureAvg),
+        yAxisID: axisIds[i],
+        data: series(m, "Avg"),
       },
-      ...bandDatasets("°C", CHART_COLORS.temperature, events.map((r) => r.temperatureMin), events.map((r) => r.temperatureMax)),
-      {
-        label: "H₂O %",
-        borderColor: CHART_COLORS.humidity.border,
-        backgroundColor: CHART_COLORS.humidity.background,
-        fill: false,
-        tension: 0.3,
-        pointRadius: 0,
-        yAxisID: "y1",
-        data: events.map((r) => r.humidityAvg),
-      },
-      ...bandDatasets("H₂O %", CHART_COLORS.humidity, events.map((r) => r.humidityMin), events.map((r) => r.humidityMax), "y1"),
-    ],
-  };
+      ...(hasBand ? bandDatasets(m.chartLabel, m.color, min, max, axisIds[i]) : []),
+    ];
+  });
+
+  const scales: Record<string, object> = { x: xAxisConfig };
+  shown.forEach((m, i) => {
+    scales[axisIds[i]] = {
+      type: "linear" as const,
+      position: i === 0 ? "left" as const : "right" as const,
+      min: m.axisMin,
+      max: m.axisMax,
+      title: { display: true, text: m.tag ? `${m.unit} ${m.tag}` : m.unit },
+      ...(i > 0 ? { grid: { drawOnChartArea: false } } : {}),
+    };
+  });
+
   const options = {
     responsive: true,
     animation: { duration: 0 },
@@ -622,23 +496,8 @@ function ChartTH({ events }: { events: SensorEventStat[] }) {
       legend: hideBandLegend,
       tooltip: { mode: "index" as InteractionMode, intersect: false },
     },
-    scales: {
-      x: xAxisConfig,
-      y: {
-        type: "linear" as const,
-        position: "left" as const,
-        title: { display: true, text: "°C" },
-      },
-      y1: {
-        type: "linear" as const,
-        position: "right" as const,
-        min: 0,
-        max: 100,
-        title: { display: true, text: "%" },
-        grid: { drawOnChartArea: false },
-      },
-    },
+    scales,
   };
 
-  return <Line data={data} options={options} />;
+  return <Line data={{ labels: chartLabels(events), datasets }} options={options} />;
 }

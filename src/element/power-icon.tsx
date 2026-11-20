@@ -33,9 +33,13 @@ export default function PowerIcon({device}: {device: DeviceEvent}) {
         return <i className={"fa fa-smog " + color}></i> 
     }
 
+    if (device.isMultiSensor()) {
+        return <i className={"fa fa-layer-group " + color}></i>
+    }
+
     if (device.isIrRemote()) {
         return <i className={"fa fa-tower-broadcast " + color}></i> 
     }
 
-    return <i className={"fa fa-circle-question" + color}></i> 
+    return <i className={"fa fa-circle-question " + color}></i> 
 }

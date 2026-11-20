@@ -16,6 +16,7 @@ import {
 } from "chart.js";
 import DeviceEvent from "../api/types/device";
 import { CHART_COLORS } from "../chart-colors";
+import { formatMetric, reportedMetrics, sparklineMetric } from "../metrics";
 import PowerIcon from "../element/power-icon";
 import HttpApi from "../api/http";
 import { DataPoint, HistoryMap } from "../App";
@@ -117,16 +118,14 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
     }
   };
 
-  let sparkline: React.ReactNode = null;
-  if (history === undefined) {
-    sparkline = <SparklineSpinner />;
-  } else if (device.isEnergySensor()) {
-    sparkline = <MiniSparkline points={history} borderColor={CHART_COLORS.power.border} backgroundColor={CHART_COLORS.power.background} />;
-  } else if (device.isCo2Sensor()) {
-    sparkline = <MiniSparkline points={history} borderColor={CHART_COLORS.co2.border} backgroundColor={CHART_COLORS.co2.background} />;
-  } else if (device.isThSensor()) {
-    sparkline = <MiniSparkline points={history} borderColor={CHART_COLORS.temperature.border} backgroundColor={CHART_COLORS.temperature.background} />;
-  }
+  const values = reportedMetrics(device.state);
+  const sparkMetric = sparklineMetric(device.state);
+  const sparkColor = sparkMetric?.color ?? CHART_COLORS.online;
+  const sparkline = history === undefined
+    ? <SparklineSpinner />
+    : <MiniSparkline points={history} borderColor={sparkColor.border} backgroundColor={sparkColor.background} />;
+  // multi-sensors can report many values; keep the block from growing too tall
+  const ValueTag = values.length > 3 ? "h3" : "h1";
 
   return (
     <div className="col-md-6 col-sm-6 col-xs-12">
@@ -166,31 +165,15 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
           {sparkline}
         </div>
         <div className="col-7 font-monospace" style={{ textAlign: "right" }}>
-          {device.isEnergySensor() && (
-            <h1>
-              <strong> {device.state.power} W </strong>
-              <br />
-              <strong> {device.state.current} A </strong>
-              <br />
-              <strong> {device.state.voltage} V </strong>
-            </h1>
-          )}
-          {device.isCo2Sensor() && (
-            <h1>
-              <strong> {device.state.temperature} ° </strong>
-              <br />
-              <strong> {device.state.humidity} % </strong>
-              <br />
-              <strong> {device.state.co2} ppm </strong>
-            </h1>
-          )}
-          {device.isThSensor() && (
-            <h1>
-              <strong> {device.state.temperature} ° </strong>
-              <br />
-              <strong> {device.state.humidity} % </strong>
-              <br />
-            </h1>
+          {values.length > 0 && (
+            <ValueTag>
+              {values.map(m => (
+                <div key={m.key}>
+                  <strong> {formatMetric(m, device.state[m.key] as number)} {m.key === "temperature" ? "°" : m.unit} </strong>
+                  {m.tag && <small className="text-muted fs-6">{m.tag}</small>}
+                </div>
+              ))}
+            </ValueTag>
           )}
           {device.state.last > 0 && (
             <small className="text-muted">

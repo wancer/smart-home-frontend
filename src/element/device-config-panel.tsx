@@ -105,8 +105,8 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
   };
 
   useEffect(() => {
-    setVoltageState(device.state.voltage);
-    setPowerState(device.state.power);
+    setVoltageState(device.state.voltage ?? 0);
+    setPowerState(device.state.power ?? 0);
   }, [device]);
 
   useEffect(() => {
@@ -267,7 +267,8 @@ export default function DeviceConfigPanel({ api, device, chipChartOpen = false, 
     ...(device.supportsToggle ? [{ section: "power" as const, icon: "fa-power-off" }] : []),
     { section: "timing", icon: "fa-clock" },
     { section: "led", icon: "fa-lightbulb" },
-    ...(device.isEnergySensor() ? [{ section: "calibration" as const, icon: "fa-gauge" }] : []),
+    // AC energy-meter calibration; a multi-sensor only has one when it reports AC power
+    ...(device.isEnergySensor() || (device.isMultiSensor() && device.state.power != null) ? [{ section: "calibration" as const, icon: "fa-gauge" }] : []),
     { section: "hardware", icon: "fa-microchip" },
     { section: "timers", icon: "fa-stopwatch" },
     { section: "rules", icon: "fa-code" },

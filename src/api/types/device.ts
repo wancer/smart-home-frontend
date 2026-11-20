@@ -1,17 +1,23 @@
 'use client';
 
-class DeviceState {
+import { MetricValues, readMetrics } from "../../metrics";
+
+class DeviceState implements MetricValues {
     public on: boolean|null;
     public last: number;
     public deviceTime: string;
 
-    public power: number;
-    public current: number;
-    public voltage: number;
-
-    public co2: number;
-    public temperature: number;
-    public humidity: number;
+    // null = the device doesn't report it
+    public power!: number | null;
+    public current!: number | null;
+    public voltage!: number | null;
+    public temperature!: number | null;
+    public humidity!: number | null;
+    public co2!: number | null;
+    public pressure!: number | null;
+    public dcPower!: number | null;
+    public dcCurrent!: number | null;
+    public dcVoltage!: number | null;
 
     public chipTemperature: number | null;
 
@@ -19,15 +25,7 @@ class DeviceState {
         this.on = decoded.on;
         this.last = decoded.last;
         this.deviceTime = "";
-
-        this.power = decoded.power;
-        this.current = decoded.current;
-        this.voltage = decoded.voltage;
-
-        this.co2 = decoded.co2;
-        this.temperature = decoded.temperature;
-        this.humidity = decoded.humidity;
-
+        Object.assign(this, readMetrics(decoded));
         this.chipTemperature = decoded.chipTemperature ?? null;
     }
 }
@@ -88,6 +86,10 @@ export default class DeviceEvent {
 
     public isThSensor(): boolean {
         return this.sensorType === 't-h';
+    }
+
+    public isMultiSensor(): boolean {
+        return this.sensorType === 'multi';
     }
 
     public isIrRemote(): boolean {

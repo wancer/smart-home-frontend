@@ -268,6 +268,7 @@ export default function DevicesAdminPage({ api, devices, onDevicesChange }: Devi
                 <option value="energy">{t('devicesAdmin.form_sensorEnergy')}</option>
                 <option value="co2">{t('devicesAdmin.form_sensorCo2')}</option>
                 <option value="t-h">{t('devicesAdmin.form_sensorTH')}</option>
+                <option value="multi">{t('devicesAdmin.form_sensorMulti')}</option>
                 <option value="ir">{t('devicesAdmin.form_sensorIr')}</option>
               </Form.Select>
             </Form.Group>

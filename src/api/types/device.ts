@@ -1,4 +1,4 @@
-import { MetricValues, readMetrics } from "../../metrics";
+import { MetricKey, MetricValues, readMetrics } from "../../metrics";
 
 class DeviceState implements MetricValues {
     public on: boolean|null;
@@ -39,6 +39,14 @@ export type SensorHistory = {
 export type StorageTier = {
     step: number;
     keep: number;
+};
+
+/** What the dashboard shows for a device. */
+export type DashboardView = {
+    /** Sparkline metric; "" = auto (the first one reported), "none" = no chart. */
+    chart: MetricKey | "" | "none";
+    /** Values shown as numbers, in display order; null = every reported one. */
+    values: MetricKey[] | null;
 };
 
 /** Tasmota GPIO template, as read from the device. */
@@ -102,6 +110,7 @@ export default class DeviceEvent {
     public offlineTimeout: number;
     public sensorHistory?: SensorHistory;
     public storageTiers: StorageTier[];
+    public dashboard: DashboardView;
 
     constructor(decoded: any) {
         this.id = decoded.id;
@@ -115,6 +124,7 @@ export default class DeviceEvent {
         this.offlineTimeout = decoded.offlineTimeout ?? 0;
         this.sensorHistory = decoded.sensorHistory ?? undefined;
         this.storageTiers = decoded.storageTiers ?? [{ step: 300, keep: 0 }];
+        this.dashboard = { chart: decoded.dashboard?.chart ?? "", values: decoded.dashboard?.values ?? null };
     }
 
     public isEnergySensor(): boolean {

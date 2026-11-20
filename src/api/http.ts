@@ -1,4 +1,4 @@
-import DeviceEvent, { StorageTier } from "./types/device";
+import DeviceEvent, { DashboardView, StorageTier } from "./types/device";
 import Login from "./types/login";
 import { SensorEvent } from "./types/ws-event";
 import { CredentialResponse } from '@react-oauth/google';
@@ -165,6 +165,11 @@ export default class HttpApi {
 
     public async updateDevice(deviceId: number, data: { name: string; topic: string; enabled: boolean; offlineTimeout: number; storageTiers?: StorageTier[] }): Promise<DeviceEvent> {
         return new DeviceEvent(await this.sendJson('PUT', `/api/devices/${deviceId}`, data));
+    }
+
+    /** Sets what the dashboard shows for the device. */
+    public async updateDashboard(deviceId: number, view: DashboardView): Promise<DeviceEvent> {
+        return new DeviceEvent(await this.sendJson('PUT', `/api/devices/${deviceId}/dashboard`, view));
     }
 
     /** Re-reads template, chip/firmware and sensors from the device and re-detects its type. null if the device is offline (409). */

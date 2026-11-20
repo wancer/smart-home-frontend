@@ -8,15 +8,16 @@ import { useWebSocket } from "react-use-websocket/dist/lib/use-websocket"
 import {BrowserRouter, Routes, Route, } from "react-router-dom";
 import { Alert, Button, Container, Row, Spinner } from 'react-bootstrap';
 import { useToasts } from "./element/use-toasts.tsx";
-import { METRICS, sparklineMetric } from "./metrics.ts";
+import { METRICS, MetricValues, readMetrics } from "./metrics.ts";
 
 import Menu from "./page/menu.tsx";
 import { DashboardPage } from "./page/dashboard.tsx";
 import DevicesAdminPage from "./page/devices-admin-page.tsx";
 import ReportPage from "./page/report-page.tsx";
 
-export type DataPoint = { time: number; value: number };
-export type HistoryMap = Record<number, DataPoint[] | undefined>;
+/** Recent readings for the dashboard sparklines; all metrics, so the chart metric can change. */
+export type HistoryPoint = MetricValues & { time: number };
+export type HistoryMap = Record<number, HistoryPoint[] | undefined>;
 
 const FIVE_MIN_S = 300;
 
@@ -57,14 +58,12 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
 
         if (!device.hasSensorData()) return;
 
-        const metric = sparklineMetric(device.state);
-        const value = metric ? exact[metric.key] : null;
-        if (value == null) return;
         const now = exact.time;
+        const point: HistoryPoint = { ...readMetrics(exact as unknown as Record<string, unknown>), time: now };
         setHistoryMap(prev => {
           const cutoff = now - FIVE_MIN_S;
           const existing = (prev[exact.deviceId] ?? []).filter(p => p.time >= cutoff);
-          return { ...prev, [exact.deviceId]: [...existing, { time: now, value }] };
+          return { ...prev, [exact.deviceId]: [...existing, point] };
         });
 
         return;
@@ -103,14 +102,8 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
       const allRecords = await api.sensorsMulti(enabledDevices.map(d => d.id));
       const newHistoryMap: HistoryMap = {};
       for (const device of enabledDevices) {
-        const records = allRecords[device.id] ?? [];
-        // follow the current state's metric, or the newest record's when the state has none
-        const metric = sparklineMetric(device.state) ?? (records.length ? sparklineMetric(records[records.length - 1]) : null);
-        newHistoryMap[device.id] = records
-          .flatMap(s => {
-            const value = metric ? s[metric.key] : null;
-            return value != null ? [{ time: s.time, value }] : [];
-          })
+        newHistoryMap[device.id] = (allRecords[device.id] ?? [])
+          .map(r => ({ ...readMetrics(r as unknown as Record<string, unknown>), time: r.time }))
           .sort((a, b) => a.time - b.time);
       }
       setHistoryMap(prev => ({ ...prev, ...newHistoryMap }));
@@ -144,7 +137,7 @@ export function AuthorizedUserApp({api}: AuthorizedUserAppProperties ) {
                 <main className="col-md-9 ml-sm-auto col-lg-10 pt-3 px-4" role="main">
                   <div className="justify-content-between align-items-center border-bottom" style={{paddingBottom: 20}}>
                     <Routes>
-                      <Route index path="/" element={<DashboardPage devices={devices} historyMap={historyMap} api={api}/>} />
+                      <Route index path="/" element={<DashboardPage devices={devices} historyMap={historyMap} api={api} onDeviceChange={d => setDevices(prev => ({ ...prev, [d.id]: d }) as unknown as DeviceEvent[])}/>} />
                       <Route path="/device/:idStr" element={<DevicePage api={api} devices={devices} latestSensorEvent={latestSensorEvent} />}/>
                       <Route path="/devices" element={<DevicesAdminPage api={api} devices={devices} onDevicesChange={setDevices} />}/>
                       <Route path="/report" element={<ReportPage api={api} devices={devices} />}/>

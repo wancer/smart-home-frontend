@@ -11,7 +11,17 @@
     "total": "Total"
   },
   "dashboard": {
-    "updated": "updated"
+    "updated": "updated",
+    "settings": "What to show",
+    "chart": "Chart",
+    "auto": "Auto",
+    "noChart": "No chart",
+    "values": "Values",
+    "allValues": "All reported values",
+    "noMetrics": "The device hasn't reported any values yet.",
+    "save": "Save",
+    "saving": "Saving…",
+    "cancel": "Cancel"
   },
   "devicePage": {
     "sensor": "Sensor",

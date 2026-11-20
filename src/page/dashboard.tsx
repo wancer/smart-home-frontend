@@ -1,20 +1,112 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTranslation } from "react-i18next";
-import { Modal, Row, Col, Button } from "react-bootstrap";
+import type { TFunction } from "i18next";
+import { Modal, Row, Col, Button, Form, Alert } from "react-bootstrap";
 import { Line } from "react-chartjs-2";
-import DeviceEvent from "../api/types/device";
+import DeviceEvent, { DashboardView } from "../api/types/device";
 import { CHART_COLORS } from "../chart-setup";
-import { formatMetric, reportedMetrics, sparklineMetric } from "../metrics";
+import { dashboardChartMetric, dashboardMetrics, formatMetric, Metric, MetricKey, METRICS } from "../metrics";
 import PowerIcon from "../element/power-icon";
 import HttpApi from "../api/http";
-import { DataPoint, HistoryMap } from "../App";
+import { HistoryMap, HistoryPoint } from "../App";
+
+type DataPoint = { time: number; value: number };
 
 type DashboardProperties = {
   devices: DeviceEvent[];
   historyMap: HistoryMap;
   api: HttpApi;
+  onDeviceChange: (device: DeviceEvent) => void;
 };
+
+/** "Power", "DC power", … (the notification rule labels). */
+function metricLabel(t: TFunction, m: Metric): string {
+  return t("notifications.metric_" + m.key.replace(/[A-Z]/g, c => "_" + c.toLowerCase()));
+}
+
+type ViewSettingsProps = {
+  device: DeviceEvent;
+  history: HistoryPoint[] | undefined;
+  api: HttpApi;
+  onClose: () => void;
+  onSaved: (device: DeviceEvent) => void;
+};
+
+/** Picks the sparkline metric and the values shown on the dashboard block. */
+function ViewSettingsModal({ device, history, api, onClose, onSaved }: ViewSettingsProps) {
+  const { t } = useTranslation();
+  const [chart, setChart] = useState<DashboardView["chart"]>(device.dashboard.chart);
+  const [values, setValues] = useState<MetricKey[] | null>(device.dashboard.values);
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  // what the device reports now or recently, plus anything already picked
+  const offered = METRICS.filter(m =>
+    device.state[m.key] != null
+    || history?.some(p => p[m.key] != null)
+    || device.dashboard.chart === m.key
+    || device.dashboard.values?.includes(m.key));
+
+  const toggleValue = (key: MetricKey) => {
+    const current = values ?? offered.filter(m => device.state[m.key] != null).map(m => m.key);
+    const next = current.includes(key) ? current.filter(k => k !== key) : [...current, key];
+    // keep display order
+    setValues(METRICS.map(m => m.key).filter(k => next.includes(k)));
+  };
+
+  const save = async () => {
+    setSaving(true);
+    setError(null);
+    try {
+      const updated = await api.updateDashboard(device.id, { chart, values });
+      const copy = Object.assign(Object.create(Object.getPrototypeOf(device)), device) as DeviceEvent;
+      copy.dashboard = updated.dashboard;
+      onSaved(copy);
+      onClose();
+    } catch (e) {
+      setError((e as Error).message);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <Modal show onHide={onClose}>
+      <Modal.Header closeButton>
+        <Modal.Title>{device.name}</Modal.Title>
+      </Modal.Header>
+      <Modal.Body>
+        {offered.length === 0 && <Alert variant="secondary">{t('dashboard.noMetrics')}</Alert>}
+        <Form.Group className="mb-3">
+          <Form.Label><strong>{t('dashboard.chart')}</strong></Form.Label>
+          <Form.Select value={chart} onChange={e => setChart(e.target.value as DashboardView["chart"])}>
+            <option value="">{t('dashboard.auto')}</option>
+            <option value="none">{t('dashboard.noChart')}</option>
+            {offered.map(m => <option key={m.key} value={m.key}>{metricLabel(t, m)}</option>)}
+          </Form.Select>
+        </Form.Group>
+        <Form.Group>
+          <Form.Label><strong>{t('dashboard.values')}</strong></Form.Label>
+          <Form.Check type="switch" id={`dash-auto-${device.id}`} label={t('dashboard.allValues')}
+            checked={values === null} onChange={() => setValues(values === null ? offered.filter(m => device.state[m.key] != null).map(m => m.key) : null)} />
+          {offered.map(m => (
+            <Form.Check key={m.key} id={`dash-${device.id}-${m.key}`} className="ms-3"
+              label={`${metricLabel(t, m)} (${m.unit})`}
+              disabled={values === null}
+              checked={values === null ? device.state[m.key] != null : values.includes(m.key)}
+              onChange={() => toggleValue(m.key)} />
+          ))}
+        </Form.Group>
+        {error && <Alert variant="danger" className="mt-3 mb-0">{error}</Alert>}
+      </Modal.Body>
+      <Modal.Footer>
+        <Button variant="secondary" onClick={onClose}>{t('dashboard.cancel')}</Button>
+        <Button variant="primary" onClick={save} disabled={saving}>{saving ? t('dashboard.saving') : t('dashboard.save')}</Button>
+      </Modal.Footer>
+    </Modal>
+  );
+}
 
 type SparklineProps = {
   points: DataPoint[];
@@ -91,10 +183,18 @@ function MiniSparkline({ points, borderColor, backgroundColor }: SparklineProps)
   );
 }
 
-function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: DataPoint[] | undefined; api: HttpApi }) {
+type DeviceBlockProps = {
+  device: DeviceEvent;
+  history: HistoryPoint[] | undefined;
+  api: HttpApi;
+  onDeviceChange: (device: DeviceEvent) => void;
+};
+
+function DeviceBlock({ device, history, api, onDeviceChange }: DeviceBlockProps) {
   const { t } = useTranslation();
   const [toggling, setToggling] = useState(false);
   const [showModal, setShowModal] = useState(false);
+  const [showSettings, setShowSettings] = useState(false);
 
   const toggle = async () => {
     setToggling(true);
@@ -105,12 +205,19 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
     }
   };
 
-  const values = reportedMetrics(device.state);
-  const sparkMetric = sparklineMetric(device.state);
+  const values = dashboardMetrics(device.dashboard, device.state);
+  // with an auto chart, follow the newest record's metric when the state has none
+  const newest = history && history.length > 0 ? history[history.length - 1] : undefined;
+  const sparkMetric = dashboardChartMetric(device.dashboard, device.state, newest);
   const sparkColor = sparkMetric?.color ?? CHART_COLORS.online;
-  const sparkline = history === undefined
-    ? <SparklineSpinner />
-    : <MiniSparkline points={history} borderColor={sparkColor.border} backgroundColor={sparkColor.background} />;
+  const points: DataPoint[] = sparkMetric && history
+    ? history.flatMap(p => { const v = p[sparkMetric.key]; return v != null ? [{ time: p.time, value: v }] : []; })
+    : [];
+  const sparkline = !device.hasSensorData() || (device.dashboard.chart === "none")
+    ? null
+    : history === undefined
+      ? <SparklineSpinner />
+      : <MiniSparkline points={points} borderColor={sparkColor.border} backgroundColor={sparkColor.background} />;
   // multi-sensors can report many values; keep the block from growing too tall
   const ValueTag = values.length > 3 ? "h3" : "h1";
 
@@ -122,12 +229,21 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
             <PowerIcon device={device} />
             <strong>{device.name}</strong>
           </Link>
-          {device.supportsToggle && device.state.on !== null && (
-            <Button variant="outline-secondary" size="sm" title={t('configPanel.section_power')} onClick={e => { e.preventDefault(); setShowModal(true); }} className="ms-auto">
-              <i className="fa fa-power-off" />
+          <span className="ms-auto d-flex gap-2">
+            {device.supportsToggle && device.state.on !== null && (
+              <Button variant="outline-secondary" size="sm" title={t('configPanel.section_power')} onClick={e => { e.preventDefault(); setShowModal(true); }}>
+                <i className="fa fa-power-off" />
+              </Button>
+            )}
+            <Button variant="outline-secondary" size="sm" title={t('dashboard.settings')} onClick={() => setShowSettings(true)}>
+              <i className="fa fa-sliders" />
             </Button>
-          )}
+          </span>
         </h2>
+        {showSettings && (
+          <ViewSettingsModal device={device} history={history} api={api}
+            onClose={() => setShowSettings(false)} onSaved={onDeviceChange} />
+        )}
         <Modal show={showModal} onHide={() => setShowModal(false)}>
           <Modal.Header closeButton>
             <Modal.Title>{device.name}</Modal.Title>
@@ -148,10 +264,12 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
         </Modal>
       </div>
       <div className="row align-items-center">
-        <div className="col-5">
-          {sparkline}
-        </div>
-        <div className="col-7 font-monospace" style={{ textAlign: "right" }}>
+        {sparkline && (
+          <div className="col-5">
+            {sparkline}
+          </div>
+        )}
+        <div className={(sparkline ? "col-7" : "col-12") + " font-monospace"} style={{ textAlign: "right" }}>
           {values.length > 0 && (
             <ValueTag>
               {values.map(m => (
@@ -173,7 +291,7 @@ function DeviceBlock({ device, history, api }: { device: DeviceEvent; history: D
   );
 }
 
-export function DashboardPage({ devices, historyMap, api }: DashboardProperties) {
+export function DashboardPage({ devices, historyMap, api, onDeviceChange }: DashboardProperties) {
   return (
     <>
       <div className="row">
@@ -185,6 +303,7 @@ export function DashboardPage({ devices, historyMap, api }: DashboardProperties)
             device={device}
             history={historyMap[device.id]}
             api={api}
+            onDeviceChange={onDeviceChange}
           />
         ))}
       </div>

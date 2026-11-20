@@ -1,3 +1,4 @@
+import type { DashboardView } from "./api/types/device";
 import { CHART_COLORS, ChartColor } from "./chart-setup";
 
 /**
@@ -73,6 +74,19 @@ const SPARKLINE_ORDER: MetricKey[] = [
 export function sparklineMetric(values: MetricValues): Metric | null {
   const key = SPARKLINE_ORDER.find(k => values[k] != null);
   return key ? METRIC_BY_KEY[key] : null;
+}
+
+/** The dashboard chart metric: the chosen one, or the auto one (`fallback` when the state has none); null = no chart. */
+export function dashboardChartMetric(view: DashboardView, values: MetricValues, fallback?: MetricValues): Metric | null {
+  if (view.chart === "none") return null;
+  if (view.chart !== "") return METRIC_BY_KEY[view.chart] ?? null;
+  return sparklineMetric(values) ?? (fallback ? sparklineMetric(fallback) : null);
+}
+
+/** The dashboard values with a value: the chosen ones (in the chosen order), or every reported one. */
+export function dashboardMetrics(view: DashboardView, values: MetricValues): Metric[] {
+  if (view.values === null) return reportedMetrics(values);
+  return view.values.map(k => METRIC_BY_KEY[k]).filter(m => m && values[m.key] != null);
 }
 
 /** Charts on the device page; each shows up to two metrics (left and right axis). */
